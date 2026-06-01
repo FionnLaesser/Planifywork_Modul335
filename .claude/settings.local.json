@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(Get-ChildItem -Recurse \"C:\\\\Program Files\\\\JetBrains\\\\Intelij\\\\Modul_335_Mobile_Applikation\" -File | Select-Object FullName | ForEach-Object { $_.FullName.Replace\\(\"C:\\\\Program Files\\\\JetBrains\\\\Intelij\\\\Modul_335_Mobile_Applikation\\\\\", \"\"\\) } | Sort-Object)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git push *)",
+      "PowerShell(New-Item *)",
+      "Bash(gh project *)",
+      "PowerShell(gh *)"
+    ]
+  }
+}
