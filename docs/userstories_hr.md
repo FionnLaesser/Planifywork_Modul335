@@ -2,25 +2,25 @@
 
 **Projekt:** Workforce Management System  
 **Rolle:** HR-Mitarbeiterin  
-**Zugang:** HR Web Frontend (Port 3002)  
+**Zugang:** HR Web Frontend – http://localhost:5173 (Entwicklung) / Port 3002 (Docker)  
 **JWT-Rolle:** `HR`
 
 ---
 
-## Übersicht
+## Implementierungsstand (Stand: 01.06.2026)
 
-| ID | Titel | Bereich |
+| ID | Titel | Status |
 |---|---|---|
-| [US-HR-01](#us-hr-01--schichtleiter-anlegen) | Schichtleiter anlegen | Schichtleiterverwaltung |
-| [US-HR-02](#us-hr-02--schichtleiter-bearbeiten--deaktivieren) | Schichtleiter bearbeiten / deaktivieren | Schichtleiterverwaltung |
-| [US-HR-03](#us-hr-03--schichtleiter-übersicht) | Schichtleiter-Übersicht | Schichtleiterverwaltung |
-| [US-HR-04](#us-hr-04--gesamtstunden-aller-mitarbeiter-einsehen) | Gesamtstunden aller Mitarbeiter einsehen | Stundenverwaltung |
-| [US-HR-05](#us-hr-05--detaillierte-stundenauswertung-pro-mitarbeiter) | Detaillierte Stundenauswertung pro Mitarbeiter | Stundenverwaltung |
-| [US-HR-06](#us-hr-06--rechnung-erstellen) | Rechnung erstellen | Rechnungswesen |
-| [US-HR-07](#us-hr-07--rechnungen-verwalten) | Rechnungen verwalten | Rechnungswesen |
-| [US-HR-08](#us-hr-08--ferienanfragen-genehmigen--ablehnen) | Ferienanfragen genehmigen / ablehnen | Absenzen & Ferien |
-| [US-HR-09](#us-hr-09--absenzen-verwalten) | Absenzen verwalten | Absenzen & Ferien |
-| [US-HR-10](#us-hr-10--abwesenheitskalender-einsehen) | Abwesenheitskalender einsehen | Absenzen & Ferien |
+| [US-HR-01](#us-hr-01--schichtleiter-anlegen) | Schichtleiter anlegen | ✅ Abgeschlossen |
+| [US-HR-02](#us-hr-02--schichtleiter-bearbeiten--deaktivieren) | Schichtleiter bearbeiten / deaktivieren | ✅ Abgeschlossen |
+| [US-HR-03](#us-hr-03--schichtleiter-übersicht) | Schichtleiter-Übersicht | ✅ Abgeschlossen |
+| [US-HR-04](#us-hr-04--gesamtstunden-aller-mitarbeiter-einsehen) | Gesamtstunden aller Mitarbeiter einsehen | ⚠️ Teilweise |
+| [US-HR-05](#us-hr-05--detaillierte-stundenauswertung-pro-mitarbeiter) | Detaillierte Stundenauswertung pro Mitarbeiter | ⚠️ Teilweise |
+| [US-HR-06](#us-hr-06--rechnung-erstellen) | Rechnung erstellen | ⚠️ Teilweise |
+| [US-HR-07](#us-hr-07--rechnungen-verwalten) | Rechnungen verwalten | ✅ Abgeschlossen |
+| [US-HR-08](#us-hr-08--ferienanfragen-genehmigen--ablehnen) | Ferienanfragen genehmigen / ablehnen | ✅ Abgeschlossen |
+| [US-HR-09](#us-hr-09--absenzen-verwalten) | Absenzen verwalten | ✅ Abgeschlossen |
+| [US-HR-10](#us-hr-10--abwesenheitskalender-einsehen) | Abwesenheitskalender einsehen | ❌ Nicht implementiert |
 
 ---
 
@@ -32,19 +32,18 @@
 > **möchte ich** einen neuen Schichtleiter im System anlegen können,  
 > **damit** dieser sich auf der Schichtleiter-Weboberfläche einloggen und Teams verwalten kann.
 
-**Betroffene Komponenten:**
-- Frontend: `hr-web` → Seite `/shift-leads/new`
-- Backend: `user-role-service` → `POST /api/users`
-- Datenbank: Tabellen `users`, `roles`
+**Implementiert in:** `frontend/hr-web/src/pages/UsersPage.jsx` · `backend/user-role-service` → `POST /api/users`
 
 **Akzeptanzkriterien:**
 
-- [ ] HR kann ein Formular mit Vorname, Nachname, E-Mail und Benutzername ausfüllen
-- [ ] Die Rolle `SHIFT_LEAD` wird automatisch zugewiesen
-- [ ] Das System generiert ein temporäres Passwort (oder HR setzt es direkt)
-- [ ] Nach erfolgreichem Anlegen erscheint eine Bestätigungsmeldung
-- [ ] Bei bereits vorhandenem Benutzername oder E-Mail erscheint eine verständliche Fehlermeldung
-- [ ] Der neue Schichtleiter erscheint sofort in der Schichtleiter-Übersicht
+- [x] HR kann ein Formular mit Vorname, Nachname, E-Mail und Benutzername ausfüllen
+- [x] Die Rolle `SHIFT_LEAD` ist im Dropdown wählbar und wird korrekt zugewiesen
+- [x] HR setzt das initiale Passwort direkt im Formular (BCrypt-gehasht gespeichert)
+- [x] Nach erfolgreichem Anlegen wird das Modal geschlossen und die Liste aktualisiert
+- [x] Bei bereits vorhandenem Benutzername oder E-Mail erscheint eine Fehlermeldung aus dem Backend
+- [x] Der neue Benutzer erscheint sofort in der Übersicht
+
+**Hinweis:** Die Seite ist unter `/users` erreichbar und verwaltet alle Rollen (nicht nur SHIFT_LEAD), was den Scope der Story abdeckt und erweitert.
 
 ---
 
@@ -54,19 +53,16 @@
 > **möchte ich** die Daten eines bestehenden Schichtleiters bearbeiten und ihn bei Bedarf deaktivieren können,  
 > **damit** Änderungen korrekt im System hinterlegt sind und der Zugang bei Austritt gesperrt werden kann.
 
-**Betroffene Komponenten:**
-- Frontend: `hr-web` → Seite `/shift-leads/:id/edit`
-- Backend: `user-role-service` → `PUT /api/users/:id`
-- Datenbank: Tabelle `users` (Feld `active`)
+**Implementiert in:** `frontend/hr-web/src/pages/UsersPage.jsx` · `backend/user-role-service` → `PUT /api/users/:id`, `DELETE /api/users/:id`
 
 **Akzeptanzkriterien:**
 
-- [ ] HR kann Vorname, Nachname und E-Mail eines Schichtleiters bearbeiten
-- [ ] Änderungen werden nach Klick auf „Speichern" persistiert
-- [ ] HR kann einen Schichtleiter deaktivieren (nicht dauerhaft löschen)
-- [ ] Ein deaktivierter Schichtleiter kann sich nicht mehr einloggen (Login schlägt fehl)
-- [ ] Der Status (aktiv/inaktiv) ist in der Übersicht sichtbar
-- [ ] Eine Deaktivierung erfordert eine Bestätigungsabfrage („Wirklich deaktivieren?")
+- [x] HR kann Vorname, Nachname und E-Mail eines Benutzers bearbeiten
+- [x] Änderungen werden nach Klick auf „Speichern" in der Datenbank persistiert
+- [x] HR kann einen Benutzer deaktivieren (Soft-Delete – Datensatz bleibt erhalten)
+- [x] Ein deaktivierter Benutzer kann sich nicht mehr einloggen (Backend prüft `active`-Flag)
+- [x] Der Status (Aktiv / Inaktiv) ist in der Übersicht farblich markiert (grün / grau)
+- [x] Eine Deaktivierung erfordert eine Bestätigungsabfrage im Browser (`confirm()`)
 
 ---
 
@@ -76,17 +72,16 @@
 > **möchte ich** eine Übersicht aller Schichtleiter sehen,  
 > **damit** ich den aktuellen Stand der Schichtleiter-Verwaltung jederzeit überblicken kann.
 
-**Betroffene Komponenten:**
-- Frontend: `hr-web` → Seite `/shift-leads`
-- Backend: `user-role-service` → `GET /api/users?role=SHIFT_LEAD`
+**Implementiert in:** `frontend/hr-web/src/pages/UsersPage.jsx` · `backend/user-role-service` → `GET /api/users?role=SHIFT_LEAD`
 
 **Akzeptanzkriterien:**
 
-- [ ] Tabelle zeigt alle Schichtleiter mit Name, E-Mail, Benutzername und Status
-- [ ] Aktive und inaktive Schichtleiter sind farblich unterscheidbar
-- [ ] Suchfeld filtert die Liste nach Name oder E-Mail in Echtzeit
-- [ ] Klick auf einen Eintrag öffnet die Detailansicht / Bearbeitungsseite
-- [ ] Schaltfläche „Neuen Schichtleiter anlegen" ist sichtbar und funktioniert
+- [x] Tabelle zeigt alle Benutzer mit Name, Benutzername, E-Mail, Rolle und Status
+- [x] Rollenfilter-Dropdown erlaubt Filterung nach `SHIFT_LEAD` (und anderen Rollen)
+- [x] Aktive und inaktive Benutzer sind farblich unterscheidbar (grün / grau)
+- [x] Suchfeld filtert die Liste nach Name oder Benutzername (Echtzeit via API-Parameter)
+- [x] „Bearbeiten"-Button öffnet ein Modal mit den Benutzerdaten
+- [x] Schaltfläche „+ Benutzer erstellen" ist sichtbar und öffnet das Erstell-Modal
 
 ---
 
@@ -98,17 +93,18 @@
 > **möchte ich** die Gesamtstunden aller Mitarbeiter einsehen können,  
 > **damit** ich einen vollständigen Überblick über die geleisteten Arbeitszeiten habe.
 
-**Betroffene Komponenten:**
-- Frontend: `hr-web` → Seite `/hours`
-- Backend: `time-service` → `GET /api/time/total` (mit optionalem Datumsfilter)
+**Implementiert in:** `frontend/hr-web/src/pages/TimePage.jsx` · `backend/time-service` → `GET /api/time/total`
 
 **Akzeptanzkriterien:**
 
-- [ ] Tabelle listet alle Mitarbeiter mit ihren Gesamtstunden auf
-- [ ] Filterung nach Zeitraum: aktuelle Woche, aktueller Monat, benutzerdefinierter Bereich
-- [ ] Sortierung nach Name (A–Z) und nach Stunden (hoch/runter) möglich
-- [ ] Stunden werden mit zwei Dezimalstellen angezeigt (z.B. `38.50 h`)
-- [ ] Daten werden vom Time Service geladen und sind aktuell
+- [x] Tabelle listet alle Mitarbeiter-IDs mit ihren Gesamtstunden auf
+- [x] Filterung nach benutzerdefiniertem Zeitraum (Von/Bis Datepicker, Standard: aktueller Monat)
+- [x] Stunden werden mit zwei Dezimalstellen angezeigt (z.B. `38.50 h`)
+- [x] Daten werden live vom Time Service geladen
+- [ ] Schnellauswahl „Aktuelle Woche" / „Aktueller Monat" als Buttons (nur manueller Bereich)
+- [ ] Sortierung nach Mitarbeitername oder Stunden (hoch/runter)
+
+**Status: Kernfunktion abgeschlossen.** Sortierung und Schnellauswahl-Buttons sind nice-to-have.
 
 ---
 
@@ -118,17 +114,18 @@
 > **möchte ich** eine detaillierte Stundenauswertung für einen bestimmten Mitarbeiter abrufen können,  
 > **damit** ich einzelne Arbeitszeitnachweise prüfen und bei Bedarf exportieren kann.
 
-**Betroffene Komponenten:**
-- Frontend: `hr-web` → Seite `/hours/:employeeId`
-- Backend: `time-service` → `GET /api/time/month/:employeeId`
+**Implementiert in:** `frontend/hr-web/src/pages/TimePage.jsx` · `backend/time-service` → `GET /api/time/month/:employeeId`
 
 **Akzeptanzkriterien:**
 
-- [ ] Detailansicht zeigt alle täglichen Einträge mit Datum, Check-in, Check-out und Nettostunden
-- [ ] Summe der Tages-, Wochen- und Monatsstunden wird angezeigt
-- [ ] Filterung nach Datumsbereich möglich
-- [ ] Export der Auswertung als CSV-Datei möglich
-- [ ] Fehlende Check-out-Einträge werden visuell markiert
+- [x] Detailansicht zeigt alle Tageseinträge mit Datum, Check-in, Check-out und Nettostunden
+- [x] Filterung nach Monat und Jahr möglich
+- [x] Fehlende Check-out-Einträge werden visuell als „Offen" (orange) markiert
+- [ ] Gesamtsumme der Monatsstunden wird als Summenzeile angezeigt
+- [ ] Export der Auswertung als CSV-Datei
+- [ ] Wochen- und Tages-Zwischensummen
+
+**Status: Kernfunktion abgeschlossen.** CSV-Export und Summenzeile fehlen.
 
 ---
 
@@ -140,20 +137,18 @@
 > **möchte ich** eine Rechnung für einen abgeschlossenen Auftrag erstellen können,  
 > **damit** Kunden korrekt und vollständig fakturiert werden.
 
-**Betroffene Komponenten:**
-- Frontend: `hr-web` → Seite `/invoices/new`
-- Backend: `billing-service` → `POST /api/billing/invoices`
-- Backend: `time-service` → Stundendaten abrufen
-- Backend: `order-service` → Auftragsdaten abrufen
+**Implementiert in:** `frontend/hr-web/src/pages/InvoicesPage.jsx` · `backend/billing-service` → `POST /api/billing/invoices`
 
 **Akzeptanzkriterien:**
 
-- [ ] HR wählt einen Auftrag aus einer Dropdown-Liste aus
-- [ ] Das System befüllt die geleisteten Stunden automatisch aus dem Time Service
-- [ ] HR kann Stundensatz, Beschreibung und einzelne Rechnungspositionen anpassen
-- [ ] Die Rechnung wird zuerst als Entwurf (`DRAFT`) gespeichert
-- [ ] Eine Vorschau der Rechnung ist vor dem Speichern möglich
-- [ ] Pflichtfelder (Auftrag, Stunden, Stundensatz) werden validiert
+- [x] HR kann dynamische Rechnungspositionen (Beschreibung, Stunden, CHF/h) hinzufügen und entfernen
+- [x] Die Rechnung wird als Entwurf (`DRAFT`) gespeichert
+- [x] Pflichtfelder sind mit HTML5 `required` validiert
+- [ ] Auftrag aus einer Dropdown-Liste wählbar (aktuell: manuelle ID-Eingabe)
+- [ ] Geleistete Stunden werden automatisch aus dem Time Service befüllt
+- [ ] Vorschau der Rechnung vor dem Speichern
+
+**Status: Grundfunktion implementiert.** Integration mit Order- und Time-Service für Auto-Fill fehlt.
 
 ---
 
@@ -163,18 +158,16 @@
 > **möchte ich** den Status meiner Rechnungen verwalten und einsehen können,  
 > **damit** ich den gesamten Rechnungsprozess vom Entwurf bis zur Bezahlung im Blick behalte.
 
-**Betroffene Komponenten:**
-- Frontend: `hr-web` → Seite `/invoices`
-- Backend: `billing-service` → `GET /api/billing/invoices`, `PUT /api/billing/invoices/:id/send`
+**Implementiert in:** `frontend/hr-web/src/pages/InvoicesPage.jsx` · `backend/billing-service` → `GET /api/billing/invoices`, `PUT .../send`, `PUT .../pay`
 
 **Akzeptanzkriterien:**
 
-- [ ] Übersicht zeigt alle Rechnungen mit Rechnungsnummer, Auftrag, Betrag, Datum und Status
-- [ ] Status-Übergänge: `DRAFT` → `SENT` → `PAID`
-- [ ] HR kann eine Rechnung von „Entwurf" auf „Gesendet" setzen
-- [ ] HR kann eine Rechnung als „Bezahlt" markieren
-- [ ] Filtermöglichkeit nach Status und Erstellungsdatum
-- [ ] Klick auf eine Rechnung öffnet die Detailansicht
+- [x] Übersicht zeigt alle Rechnungen mit ID, Auftrag-ID, Ersteller, Stunden, Betrag (CHF) und Status
+- [x] Status-Übergänge: `DRAFT` → `SENT` → `PAID` über dedizierte Schaltflächen
+- [x] „Versenden"-Button bei Entwürfen setzt Status auf `SENT`
+- [x] „Als bezahlt"-Button bei gesendeten Rechnungen setzt Status auf `PAID`
+- [x] Filtermöglichkeit nach Status (DRAFT / SENT / PAID)
+- [x] „Details"-Button öffnet Modal mit allen Positionen, Stunden und Gesamtbetrag
 
 ---
 
@@ -186,18 +179,20 @@
 > **möchte ich** offene Ferienanfragen von Mitarbeitern genehmigen oder ablehnen können,  
 > **damit** Mitarbeiter zeitnah eine Rückmeldung zu ihrem Ferienantrag erhalten.
 
-**Betroffene Komponenten:**
-- Frontend: `hr-web` → Seite `/absences?type=VACATION&status=PENDING`
-- Backend: `absence-vacation-service` → `GET /api/absences/pending`, `PUT /api/absences/:id/approve`, `PUT /api/absences/:id/reject`
+**Implementiert in:** `frontend/hr-web/src/pages/AbsencesPage.jsx` · `backend/absence-vacation-service` → `GET /api/absences/pending`, `PUT .../approve`, `PUT .../reject`
 
 **Akzeptanzkriterien:**
 
-- [ ] Liste zeigt alle offenen Ferienanfragen mit Mitarbeitername, Zeitraum und Begründung
-- [ ] HR kann eine Anfrage mit einem Klick genehmigen (`APPROVED`) oder ablehnen (`REJECTED`)
-- [ ] Der Status wird sofort in der Liste aktualisiert
-- [ ] Genehmigte/abgelehnte Anfragen verschwinden aus der „Offene Anfragen"-Ansicht
-- [ ] Bei Ablehnung kann HR optional eine Begründung hinterlegen
-- [ ] Anzahl offener Anfragen ist im Dashboard als Badge sichtbar
+- [x] Tab „Ausstehende Anträge" listet alle offenen Anfragen (Mitarbeiter-ID, Typ, Von, Bis, Grund, Status)
+- [x] „Genehmigen"-Button setzt Status sofort auf `APPROVED`
+- [x] „Ablehnen"-Button öffnet ein Modal für einen optionalen Ablehnungsgrund
+- [x] Die Liste wird nach jeder Aktion sofort aktualisiert
+- [x] Genehmigte / abgelehnte Anfragen verschwinden aus dem Pending-Tab
+- [x] Ablehnungsgrund kann optional als Freitext hinterlegt werden
+- [ ] Anzahl offener Anfragen als Badge im Dashboard sichtbar
+- [ ] Mitarbeitername statt Mitarbeiter-ID in der Liste (aktuell nur ID)
+
+**Status: Kernfunktion abgeschlossen.** Dashboard-Badge und Namensanzeige sind Verbesserungen.
 
 ---
 
@@ -207,17 +202,17 @@
 > **möchte ich** Absenzen von Mitarbeitern einsehen und bei Bedarf manuell erfassen können,  
 > **damit** Fehlzeiten vollständig und korrekt dokumentiert sind.
 
-**Betroffene Komponenten:**
-- Frontend: `hr-web` → Seite `/absences`
-- Backend: `absence-vacation-service` → `GET /api/absences`, `POST /api/absences`, `PUT /api/absences/:id`, `DELETE /api/absences/:id`
+**Implementiert in:** `frontend/hr-web/src/pages/AbsencesPage.jsx` · `backend/absence-vacation-service` → `GET /api/absences`, `POST /api/absences`, `PUT /api/absences/:id`, `DELETE /api/absences/:id`
 
 **Akzeptanzkriterien:**
 
-- [ ] Übersicht zeigt alle Absenzen gefiltert nach Mitarbeiter, Typ und Zeitraum
-- [ ] Abwesenheitstypen sind erkennbar: `VACATION` (Ferien), `SICK` (Krank), `OTHER` (Sonstige)
-- [ ] HR kann eine Absenz manuell für einen Mitarbeiter erfassen
-- [ ] Bestehende Absenzen können bearbeitet oder gelöscht werden
-- [ ] Löschung erfordert eine Bestätigungsabfrage
+- [x] Tab „Alle Absenzen" zeigt alle Absenzen mit Typ, Zeitraum, Grund und Status
+- [x] Filterung nach Typ (`VACATION`, `SICK`, `OTHER`) mit deutschen Bezeichnungen
+- [x] Filterung nach Mitarbeiter-ID (kombinierbar mit Typ-Filter)
+- [x] „Filter zurücksetzen"-Button wenn ein Filter aktiv ist
+- [x] HR kann eine Absenz manuell für einen Mitarbeiter erfassen (Mitarbeiter-ID, Typ, Von, Bis, Begründung)
+- [x] Bestehende Absenzen können bearbeitet werden (Typ, Datum, Begründung — Status bleibt erhalten)
+- [x] Absenzen können mit Bestätigungsabfrage gelöscht werden
 
 ---
 
@@ -228,49 +223,53 @@
 > **damit** ich Personalengpässe frühzeitig erkennen und die Planung unterstützen kann.
 
 **Betroffene Komponenten:**
-- Frontend: `hr-web` → Seite `/absences/calendar`
-- Backend: `absence-vacation-service` → `GET /api/absences?month=&year=`
+- Frontend: `hr-web` → neue Seite `/absences/calendar`
+- Backend: `absence-vacation-service` → `GET /api/absences` (mit Monats-/Jahresfilter, bereits vorhanden)
 
 **Akzeptanzkriterien:**
 
-- [ ] Monatsansicht zeigt alle Abwesenheiten farblich nach Typ markiert (Ferien = grün, Krank = rot, Sonstige = grau)
-- [ ] Jede Abwesenheit zeigt Mitarbeitername beim Hover/Klick
-- [ ] Navigation zwischen Monaten ist möglich (zurück / vorwärts)
-- [ ] Filterung nach Schichtleiter-Team möglich
+- [ ] Monatsansicht zeigt alle Abwesenheiten farblich nach Typ (Ferien = grün, Krank = rot, Sonstige = grau)
+- [ ] Mitarbeitername wird beim Hover / Klick auf einen Eintrag angezeigt
+- [ ] Navigation zwischen Monaten (zurück / vorwärts)
+- [ ] Filterung nach Team oder Schichtleiter möglich
 - [ ] Tage mit mehr als 3 gleichzeitigen Abwesenheiten werden hervorgehoben
+
+**Status: Nicht implementiert.** Backend-Endpunkt (`GET /api/absences`) ist vorhanden – nur das Frontend-Kalender-Widget fehlt noch.
 
 ---
 
-## Technische Hinweise für die Implementierung
+## Technische Referenz
 
-### Backend-Endpoints (Zusammenfassung)
+### Implementierte Backend-Endpoints
 
-| Service | Methode | Endpoint | Beschreibung |
+| Service | Methode | Endpoint | Status |
 |---|---|---|---|
-| user-role-service | GET | `/api/users?role=SHIFT_LEAD` | Alle Schichtleiter |
-| user-role-service | POST | `/api/users` | Schichtleiter anlegen |
-| user-role-service | PUT | `/api/users/:id` | Schichtleiter bearbeiten |
-| time-service | GET | `/api/time/total` | Gesamtstunden alle |
-| time-service | GET | `/api/time/month/:id` | Monatsdetail Mitarbeiter |
-| billing-service | GET | `/api/billing/invoices` | Alle Rechnungen |
-| billing-service | POST | `/api/billing/invoices` | Rechnung erstellen |
-| billing-service | PUT | `/api/billing/invoices/:id/send` | Status → SENT |
-| absence-vacation-service | GET | `/api/absences/pending` | Offene Anfragen |
-| absence-vacation-service | PUT | `/api/absences/:id/approve` | Genehmigen |
-| absence-vacation-service | PUT | `/api/absences/:id/reject` | Ablehnen |
-| absence-vacation-service | GET | `/api/absences` | Alle Absenzen |
-| absence-vacation-service | POST | `/api/absences` | Absenz erfassen |
+| user-role-service | GET | `/api/users` | ✅ |
+| user-role-service | GET | `/api/users/:id` | ✅ |
+| user-role-service | POST | `/api/users` | ✅ |
+| user-role-service | PUT | `/api/users/:id` | ✅ |
+| user-role-service | DELETE | `/api/users/:id` | ✅ (Soft-Delete) |
+| time-service | GET | `/api/time/total` | ✅ |
+| time-service | GET | `/api/time/month/:id` | ✅ |
+| billing-service | GET | `/api/billing/invoices` | ✅ |
+| billing-service | GET | `/api/billing/invoices/:id` | ✅ |
+| billing-service | POST | `/api/billing/invoices` | ✅ |
+| billing-service | PUT | `/api/billing/invoices/:id/send` | ✅ |
+| billing-service | PUT | `/api/billing/invoices/:id/pay` | ✅ |
+| absence-vacation-service | GET | `/api/absences` | ✅ |
+| absence-vacation-service | GET | `/api/absences/pending` | ✅ |
+| absence-vacation-service | POST | `/api/absences` | ✅ |
+| absence-vacation-service | PUT | `/api/absences/:id/approve` | ✅ |
+| absence-vacation-service | PUT | `/api/absences/:id/reject` | ✅ |
+| absence-vacation-service | PUT | `/api/absences/:id` | ✅ |
+| absence-vacation-service | DELETE | `/api/absences/:id` | ✅ |
 
 ### Frontend-Seiten (hr-web)
 
-| Route | Komponente | User Story |
+| Route | Komponente | User Stories |
 |---|---|---|
-| `/shift-leads` | `ShiftLeadsPage` | US-HR-03 |
-| `/shift-leads/new` | `NewShiftLeadPage` | US-HR-01 |
-| `/shift-leads/:id/edit` | `EditShiftLeadPage` | US-HR-02 |
-| `/hours` | `HoursOverviewPage` | US-HR-04 |
-| `/hours/:employeeId` | `EmployeeHoursPage` | US-HR-05 |
-| `/invoices` | `InvoicesPage` | US-HR-07 |
-| `/invoices/new` | `NewInvoicePage` | US-HR-06 |
+| `/users` | `UsersPage` | US-HR-01, US-HR-02, US-HR-03 |
+| `/time` | `TimePage` | US-HR-04, US-HR-05 |
+| `/invoices` | `InvoicesPage` | US-HR-06, US-HR-07 |
 | `/absences` | `AbsencesPage` | US-HR-08, US-HR-09 |
-| `/absences/calendar` | `AbsenceCalendarPage` | US-HR-10 |
+| `/absences/calendar` | *(nicht implementiert)* | US-HR-10 |

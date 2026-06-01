@@ -3,6 +3,7 @@ package com.workforce.absence.controller;
 import com.workforce.absence.dto.AbsenceResponse;
 import com.workforce.absence.dto.CreateAbsenceRequest;
 import com.workforce.absence.dto.ReviewRequest;
+import com.workforce.absence.dto.UpdateAbsenceRequest;
 import com.workforce.absence.service.AbsenceService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -82,6 +83,22 @@ public class AbsenceController {
     @PreAuthorize("hasAnyRole('HR', 'ADMIN', 'EMPLOYEE')")
     public ResponseEntity<AbsenceResponse> create(@RequestBody CreateAbsenceRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(absenceService.create(request));
+    }
+
+    /**
+     * Aktualisiert Typ, Zeitraum und Begründung einer Abwesenheit.
+     * US-HR-09: Absenzen durch HR bearbeiten.
+     *
+     * @param id      ID der Abwesenheit im URL-Pfad
+     * @param request DTO mit den neuen Werten
+     * @return aktualisierte Abwesenheit
+     */
+    @PutMapping("/{id}")
+    @PreAuthorize("hasAnyRole('HR', 'ADMIN')")
+    public ResponseEntity<AbsenceResponse> update(
+            @PathVariable Long id,
+            @RequestBody UpdateAbsenceRequest request) {
+        return ResponseEntity.ok(absenceService.update(id, request));
     }
 
     /**

@@ -3,6 +3,7 @@ package com.workforce.absence.service;
 import com.workforce.absence.dto.AbsenceResponse;
 import com.workforce.absence.dto.CreateAbsenceRequest;
 import com.workforce.absence.dto.ReviewRequest;
+import com.workforce.absence.dto.UpdateAbsenceRequest;
 import com.workforce.absence.exception.ResourceNotFoundException;
 import com.workforce.absence.model.Absence;
 import com.workforce.absence.model.AbsenceStatus;
@@ -100,6 +101,32 @@ public class AbsenceService {
 
         Absence absence = new Absence();
         absence.setEmployeeId(request.employeeId());
+        absence.setType(AbsenceType.valueOf(request.type()));
+        absence.setStartDate(request.startDate());
+        absence.setEndDate(request.endDate());
+        absence.setReason(request.reason());
+
+        return AbsenceResponse.from(absenceRepository.save(absence));
+    }
+
+    /**
+     * Aktualisiert Typ, Zeitraum und Begründung einer bestehenden Abwesenheit.
+     * Implementiert US-HR-09 (Absenzen bearbeiten durch HR).
+     *
+     * @param id      ID der Abwesenheit
+     * @param request DTO mit den neuen Werten
+     * @return aktualisierter {@link AbsenceResponse}
+     * @throws ResourceNotFoundException wenn nicht gefunden
+     * @throws IllegalArgumentException  wenn Enddatum vor Startdatum liegt
+     */
+    @Transactional
+    public AbsenceResponse update(Long id, UpdateAbsenceRequest request) {
+        Absence absence = findOrThrow(id);
+
+        if (request.endDate().isBefore(request.startDate())) {
+            throw new IllegalArgumentException("Enddatum darf nicht vor dem Startdatum liegen");
+        }
+
         absence.setType(AbsenceType.valueOf(request.type()));
         absence.setStartDate(request.startDate());
         absence.setEndDate(request.endDate());
