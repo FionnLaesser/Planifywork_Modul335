@@ -69,7 +69,9 @@ services:
   # ── Backend Microservices ───────────────────────────────────────────────────
 
   api-gateway:
-    build: ./backend/api-gateway
+    build:
+      context: .
+      dockerfile: backend/api-gateway/Dockerfile
     container_name: api-gateway
     restart: unless-stopped
     ports:
@@ -89,7 +91,9 @@ services:
       - workforce-net
 
   auth-service:
-    build: ./backend/auth-service
+    build:
+      context: .
+      dockerfile: backend/auth-service/Dockerfile
     container_name: auth-service
     restart: unless-stopped
     ports:
@@ -105,7 +109,9 @@ services:
       - workforce-net
 
   user-role-service:
-    build: ./backend/user-role-service
+    build:
+      context: .
+      dockerfile: backend/user-role-service/Dockerfile
     container_name: user-role-service
     restart: unless-stopped
     ports:
@@ -121,7 +127,9 @@ services:
       - workforce-net
 
   order-service:
-    build: ./backend/order-service
+    build:
+      context: .
+      dockerfile: backend/order-service/Dockerfile
     container_name: order-service
     restart: unless-stopped
     ports:
@@ -137,7 +145,9 @@ services:
       - workforce-net
 
   planning-service:
-    build: ./backend/planning-service
+    build:
+      context: .
+      dockerfile: backend/planning-service/Dockerfile
     container_name: planning-service
     restart: unless-stopped
     ports:
@@ -153,7 +163,9 @@ services:
       - workforce-net
 
   time-service:
-    build: ./backend/time-service
+    build:
+      context: .
+      dockerfile: backend/time-service/Dockerfile
     container_name: time-service
     restart: unless-stopped
     ports:
@@ -169,7 +181,9 @@ services:
       - workforce-net
 
   absence-vacation-service:
-    build: ./backend/absence-vacation-service
+    build:
+      context: .
+      dockerfile: backend/absence-vacation-service/Dockerfile
     container_name: absence-vacation-service
     restart: unless-stopped
     ports:
@@ -185,7 +199,9 @@ services:
       - workforce-net
 
   billing-service:
-    build: ./backend/billing-service
+    build:
+      context: .
+      dockerfile: backend/billing-service/Dockerfile
     container_name: billing-service
     restart: unless-stopped
     ports:
@@ -201,7 +217,9 @@ services:
       - workforce-net
 
   report-media-service:
-    build: ./backend/report-media-service
+    build:
+      context: .
+      dockerfile: backend/report-media-service/Dockerfile
     container_name: report-media-service
     restart: unless-stopped
     ports:
@@ -217,7 +235,8 @@ services:
   # ── Frontends ──────────────────────────────────────────────────────────────
 
   admin-web:
-    build: ./frontend/admin-web
+    build:
+      context: ./frontend/admin-web
     container_name: admin-web
     restart: unless-stopped
     ports:
@@ -226,7 +245,8 @@ services:
       - workforce-net
 
   hr-web:
-    build: ./frontend/hr-web
+    build:
+      context: ./frontend/hr-web
     container_name: hr-web
     restart: unless-stopped
     ports:
@@ -235,7 +255,8 @@ services:
       - workforce-net
 
   shiftlead-web:
-    build: ./frontend/shiftlead-web
+    build:
+      context: ./frontend/shiftlead-web
     container_name: shiftlead-web
     restart: unless-stopped
     ports:

@@ -1,0 +1,22 @@
+# Build-Artefakte
+**/target/
+**/.dart_tool/
+**/.flutter-plugins*
+**/build/
+
+# Node
+**/node_modules/
+**/.npm/
+
+# IDE
+.idea/
+.vscode/
+**/*.iml
+
+# Git
+.git/
+.gitignore
+
+# Docs / sonstige
+docs/
+*.md
