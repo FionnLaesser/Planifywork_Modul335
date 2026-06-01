@@ -19,7 +19,7 @@
 | [US-HR-06](#us-hr-06--rechnung-erstellen) | Rechnung erstellen | ⚠️ Teilweise |
 | [US-HR-07](#us-hr-07--rechnungen-verwalten) | Rechnungen verwalten | ✅ Abgeschlossen |
 | [US-HR-08](#us-hr-08--ferienanfragen-genehmigen--ablehnen) | Ferienanfragen genehmigen / ablehnen | ✅ Abgeschlossen |
-| [US-HR-09](#us-hr-09--absenzen-verwalten) | Absenzen verwalten | ⚠️ Teilweise |
+| [US-HR-09](#us-hr-09--absenzen-verwalten) | Absenzen verwalten | ✅ Abgeschlossen |
 | [US-HR-10](#us-hr-10--abwesenheitskalender-einsehen) | Abwesenheitskalender einsehen | ❌ Nicht implementiert |
 
 ---
@@ -202,18 +202,17 @@
 > **möchte ich** Absenzen von Mitarbeitern einsehen und bei Bedarf manuell erfassen können,  
 > **damit** Fehlzeiten vollständig und korrekt dokumentiert sind.
 
-**Implementiert in:** `frontend/hr-web/src/pages/AbsencesPage.jsx` · `backend/absence-vacation-service` → `GET /api/absences`, `DELETE /api/absences/:id`
+**Implementiert in:** `frontend/hr-web/src/pages/AbsencesPage.jsx` · `backend/absence-vacation-service` → `GET /api/absences`, `POST /api/absences`, `PUT /api/absences/:id`, `DELETE /api/absences/:id`
 
 **Akzeptanzkriterien:**
 
 - [x] Tab „Alle Absenzen" zeigt alle Absenzen mit Typ, Zeitraum, Grund und Status
 - [x] Filterung nach Typ (`VACATION`, `SICK`, `OTHER`) mit deutschen Bezeichnungen
+- [x] Filterung nach Mitarbeiter-ID (kombinierbar mit Typ-Filter)
+- [x] „Filter zurücksetzen"-Button wenn ein Filter aktiv ist
+- [x] HR kann eine Absenz manuell für einen Mitarbeiter erfassen (Mitarbeiter-ID, Typ, Von, Bis, Begründung)
+- [x] Bestehende Absenzen können bearbeitet werden (Typ, Datum, Begründung — Status bleibt erhalten)
 - [x] Absenzen können mit Bestätigungsabfrage gelöscht werden
-- [ ] HR kann eine Absenz manuell für einen Mitarbeiter erfassen (kein Erstell-Formular vorhanden)
-- [ ] Bestehende Absenzen können bearbeitet werden (kein Bearbeiten-Modal vorhanden)
-- [ ] Filterung nach Mitarbeiter und Zeitraum
-
-**Status: Ansicht und Löschung implementiert.** Erstellen und Bearbeiten durch HR fehlt noch.
 
 ---
 
@@ -262,6 +261,7 @@
 | absence-vacation-service | POST | `/api/absences` | ✅ |
 | absence-vacation-service | PUT | `/api/absences/:id/approve` | ✅ |
 | absence-vacation-service | PUT | `/api/absences/:id/reject` | ✅ |
+| absence-vacation-service | PUT | `/api/absences/:id` | ✅ |
 | absence-vacation-service | DELETE | `/api/absences/:id` | ✅ |
 
 ### Frontend-Seiten (hr-web)
