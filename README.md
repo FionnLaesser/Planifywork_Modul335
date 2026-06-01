@@ -27,18 +27,34 @@ Klasse: Modul 335
 
 ### Schritt 1 – Alles starten
 
-Im Stammverzeichnis des Projekts (`Modul_335_Mobile_Applikation/`) einmalig ausführen:
+Im Stammverzeichnis des Projekts (`Modul_335_Mobile_Applikation/`) ausführen:
 
+**Erster Start oder nach einem Reset:**
 ```bash
-docker compose up --build -d
+docker compose down -v && docker compose up --build -d
 ```
 
-Das startet **alle** Container auf einmal: Datenbanken, alle Backend-Services, alle drei Web-Frontends und die Datenbank-Admins.
+**Folgestarts** (kein Code geändert, Daten sollen erhalten bleiben):
+```bash
+docker compose up -d
+```
 
-> **Erster Start:** dauert 3–5 Minuten, da Docker alle Images baut und Maven-Abhängigkeiten lädt.  
-> **Folgestarts** (ohne Code-Änderungen): `docker compose up -d` reicht, geht in Sekunden.
+> **Erster Build:** dauert 3–5 Minuten (Maven-Dependencies, npm install).  
+> **Folgestarts:** gehen in Sekunden, da Images bereits gebaut sind.
 
-Der `user-role-service` legt beim ersten Start die vier Demo-Accounts automatisch an, sobald MySQL `healthy` meldet.
+**Wichtig – Demo-Accounts:** Die Benutzer (`admin`, `hr.mueller`, `sl.huber`, `emp.meier`) werden **nicht** per SQL-Seed angelegt, sondern beim Start des `user-role-service` per `CommandLineRunner` mit korrekt generiertem BCrypt-Hash. MySQL-Healthcheck stellt sicher, dass die Rollen bereits vorhanden sind, bevor der Service startet.
+
+Seeding prüfen:
+```bash
+docker compose logs user-role-service | grep Seed
+```
+Erwartete Ausgabe:
+```
+Seed-User angelegt: admin (ADMIN)
+Seed-User angelegt: hr.mueller (HR)
+Seed-User angelegt: sl.huber (SHIFT_LEAD)
+Seed-User angelegt: emp.meier (EMPLOYEE)
+```
 
 ---
 
@@ -140,10 +156,21 @@ docker compose down
 docker compose up --build user-role-service -d
 
 # Kompletter Reset – stoppt alles und löscht alle Datenbankdaten
-docker compose down -v
+docker compose down -v && docker compose up --build -d
 ```
 
-> Nach `docker compose down -v` werden beim nächsten `docker compose up --build -d` alle Tabellen, Rollen und Demo-Accounts automatisch neu angelegt.
+> `down -v` löscht die MySQL- und MongoDB-Volumes. Beim nächsten Start legt `init.sql` Schema und Rollen neu an, der `user-role-service` seeded die Demo-Accounts.
+
+---
+
+### Bekannte Stolpersteine
+
+| Problem | Ursache | Lösung |
+|---|---|---|
+| Login schlägt mit 401 fehl | MySQL-Volume mit falsch geseedeten Usern aus alter Version | `docker compose down -v && docker compose up --build -d` |
+| Login leitet sofort zurück auf `/login` | 401-Response vom Login-Endpoint triggerte früher einen Hard-Redirect | Behoben in `api.js` aller drei Frontends (Interceptor prüft jetzt ob Request = Login-Endpoint) |
+| Leere Seite ohne Login-Formular | `vite.config.js` fehlte → JSX wurde nicht verarbeitet | Behoben, `vite.config.js` ist vorhanden |
+| CORS-Fehler 403 | Gateway hatte kein `globalcors`, Services gaben doppelte CORS-Header | Behoben: Gateway verwaltet CORS, Services haben `cors.disable()` |
 
 ---
 
