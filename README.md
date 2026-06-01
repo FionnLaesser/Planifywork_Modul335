@@ -9,7 +9,7 @@ Klasse: Modul 335
 
 | Dokument | Beschreibung |
 |---|---|
-| [User Stories – HR](docs/userstories-hr.md) | 10 User Stories mit Akzeptanzkriterien für die HR-Rolle |
+| [User Stories – HR](docs/userstories_hr.md) | 10 User Stories mit Akzeptanzkriterien für die HR-Rolle |
 
 ---
 
