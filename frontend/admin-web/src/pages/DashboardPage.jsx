@@ -226,6 +226,8 @@ export default function DashboardPage() {
   });
   const [editing, setEditing] = useState({});
   const [apiUsers, setApiUsers] = useState([]);
+  const [apiEmployees, setApiEmployees] = useState([]);
+  const [apiHrUsers, setApiHrUsers] = useState([]);
   const [orderForm, setOrderForm] = useState(emptyOrder);
   const [hrForm, setHrForm] = useState(emptyHr);
   const [conceptForm, setConceptForm] = useState(emptyConcept);
@@ -246,8 +248,28 @@ export default function DashboardPage() {
     }
   };
 
+  const fetchApiEmployees = async () => {
+    try {
+      const { data } = await api.get('/api/users?role=EMPLOYEE');
+      setApiEmployees(data);
+    } catch {
+      showMessage('error', 'Mitarbeiter konnten nicht geladen werden.');
+    }
+  };
+
+  const fetchApiHrUsers = async () => {
+    try {
+      const { data } = await api.get('/api/users?role=HR');
+      setApiHrUsers(data);
+    } catch {
+      showMessage('error', 'HR-Benutzer konnten nicht geladen werden.');
+    }
+  };
+
   useEffect(() => {
-    if (active === 'roles') fetchApiUsers();
+    if (active === 'roles')     fetchApiUsers();
+    if (active === 'employees') fetchApiEmployees();
+    if (active === 'hr')        fetchApiHrUsers();
   }, [active]);
 
   const notices = useMemo(() => buildNotices(state), [state]);
@@ -863,22 +885,21 @@ export default function DashboardPage() {
                   <thead>
                     <tr>
                       <th>Name</th>
+                      <th>Benutzername</th>
                       <th>E-Mail</th>
                       <th>Status</th>
-                      <th>Zuständigkeiten</th>
-                      <th>Berechtigung Lohn</th>
-                      <th>Aktion</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {state.hrUsers.filter(user => matchesSearch(user, search)).map(user => (
+                    {apiHrUsers.length === 0 && (
+                      <tr><td colSpan={4} style={{ textAlign: 'center', color: '#888', padding: '12px' }}>Keine HR-Benutzer gefunden</td></tr>
+                    )}
+                    {apiHrUsers.filter(user => matchesSearch(user, search)).map(user => (
                       <tr key={user.id}>
-                        <td>{user.name}</td>
+                        <td>{user.firstName} {user.lastName}</td>
+                        <td><span className="muted">{user.username}</span></td>
                         <td>{user.email}</td>
-                        <td><StatusBadge value={user.status} /></td>
-                        <td>{user.responsibilities.join(', ') || 'Keine'}</td>
-                        <td>{user.responsibilities.includes('Lohnverwaltung') ? <StatusBadge value="erlaubt" /> : <StatusBadge value="verweigert" />}</td>
-                        <td><button className="secondary-button" type="button" onClick={() => editHrUser(user)}>Bearbeiten</button></td>
+                        <td><StatusBadge value={user.active ? 'aktiv' : 'deaktiviert'} /></td>
                       </tr>
                     ))}
                   </tbody>
@@ -1151,24 +1172,21 @@ export default function DashboardPage() {
                   <thead>
                     <tr>
                       <th>Name</th>
-                      <th>Personalnummer</th>
+                      <th>Benutzername</th>
+                      <th>E-Mail</th>
                       <th>Status</th>
-                      <th>Mobile App</th>
-                      <th>Konzept</th>
-                      <th>Bestehende Daten</th>
-                      <th>Aktion</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {state.employees.filter(employee => matchesSearch(employee, search)).map(employee => (
-                      <tr key={employee.id}>
-                        <td>{employee.name}<br /><span className="muted">{employee.email}</span></td>
-                        <td>{employee.personnelNo}</td>
-                        <td><StatusBadge value={employee.status} /></td>
-                        <td><StatusBadge value={employee.mobileAccess ? 'aktiv' : 'inaktiv'} /></td>
-                        <td>{findName(state.concepts, employee.conceptId)}</td>
-                        <td>{state.timeEntries.filter(entry => entry.employeeId === employee.id).length} Stunden, {state.reports.filter(report => report.employeeId === employee.id).length} Rapporte</td>
-                        <td><button className="secondary-button" type="button" onClick={() => { setEmployeeForm({ ...emptyEmployee, ...employee }); setEditing(current => ({ ...current, employeeId: employee.id })); }}>Bearbeiten</button></td>
+                    {apiEmployees.length === 0 && (
+                      <tr><td colSpan={4} style={{ textAlign: 'center', color: '#888', padding: '12px' }}>Keine Mitarbeiter gefunden</td></tr>
+                    )}
+                    {apiEmployees.filter(e => matchesSearch(e, search)).map(e => (
+                      <tr key={e.id}>
+                        <td>{e.firstName} {e.lastName}</td>
+                        <td><span className="muted">{e.username}</span></td>
+                        <td>{e.email}</td>
+                        <td><StatusBadge value={e.active ? 'aktiv' : 'deaktiviert'} /></td>
                       </tr>
                     ))}
                   </tbody>
