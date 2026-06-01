@@ -33,7 +33,7 @@ public class UserRoleServiceApplication {
                       String username, String email, String rawPassword,
                       String firstName, String lastName, RoleName roleName) {
         if (users.existsByUsername(username)) return;
-        roles.findByName(roleName).ifPresent(role -> {
+        roles.findByName(roleName.name()).ifPresent(role -> {
             User u = new User();
             u.setUsername(username);
             u.setEmail(email);
