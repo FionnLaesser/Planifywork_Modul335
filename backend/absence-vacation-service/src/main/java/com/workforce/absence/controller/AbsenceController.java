@@ -27,7 +27,6 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/absences")
 @RequiredArgsConstructor
-@CrossOrigin(origins = {"http://localhost:3001", "http://localhost:3002", "http://localhost:3003"})
 public class AbsenceController {
 
     private final AbsenceService absenceService;

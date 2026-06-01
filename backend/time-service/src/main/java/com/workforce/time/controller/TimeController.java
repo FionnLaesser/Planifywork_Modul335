@@ -25,7 +25,6 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/time")
 @RequiredArgsConstructor
-@CrossOrigin(origins = {"http://localhost:3001", "http://localhost:3002", "http://localhost:3003"})
 public class TimeController {
 
     private final TimeService timeService;
