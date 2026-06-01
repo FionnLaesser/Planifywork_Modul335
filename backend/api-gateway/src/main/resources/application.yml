@@ -6,22 +6,6 @@ spring:
     name: api-gateway
   cloud:
     gateway:
-      globalcors:
-        cors-configurations:
-          '[/**]':
-            allowedOrigins:
-              - "http://localhost:5173"
-              - "http://localhost:3001"
-              - "http://localhost:3002"
-              - "http://localhost:3003"
-            allowedMethods:
-              - GET
-              - POST
-              - PUT
-              - DELETE
-              - OPTIONS
-            allowedHeaders: "*"
-            allowCredentials: true
       routes:
         - id: auth-service
           uri: http://auth-service:8001
