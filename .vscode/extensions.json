@@ -1,0 +1,29 @@
+{
+  "recommendations": [
+    // Java / Spring Boot
+    "vscjava.vscode-java-pack",
+    "vmware.vscode-spring-boot",
+    "vscjava.vscode-spring-initializr",
+    "vscjava.vscode-spring-boot-dashboard",
+    "vscjava.vscode-maven",
+
+    // React / Frontend
+    "dbaeumer.vscode-eslint",
+    "esbenp.prettier-vscode",
+    "dsznajder.es7-react-js-snippets",
+
+    // Flutter / Dart
+    "dart-code.flutter",
+    "dart-code.dart-code",
+
+    // Docker
+    "ms-azuretools.vscode-docker",
+    "ms-vscode-remote.remote-containers",
+
+    // Allgemein
+    "editorconfig.editorconfig",
+    "ms-vscode.vscode-json",
+    "redhat.vscode-yaml",
+    "humao.rest-client"
+  ]
+}

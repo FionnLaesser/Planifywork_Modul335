@@ -1,0 +1,84 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "java",
+      "name": "Auth Service",
+      "request": "launch",
+      "mainClass": "com.workforce.auth.AuthServiceApplication",
+      "projectName": "auth-service"
+    },
+    {
+      "type": "java",
+      "name": "API Gateway",
+      "request": "launch",
+      "mainClass": "com.workforce.gateway.ApiGatewayApplication",
+      "projectName": "api-gateway"
+    },
+    {
+      "type": "java",
+      "name": "User Role Service",
+      "request": "launch",
+      "mainClass": "com.workforce.user.UserRoleServiceApplication",
+      "projectName": "user-role-service"
+    },
+    {
+      "type": "java",
+      "name": "Order Service",
+      "request": "launch",
+      "mainClass": "com.workforce.order.OrderServiceApplication",
+      "projectName": "order-service"
+    },
+    {
+      "type": "java",
+      "name": "Planning Service",
+      "request": "launch",
+      "mainClass": "com.workforce.planning.PlanningServiceApplication",
+      "projectName": "planning-service"
+    },
+    {
+      "type": "java",
+      "name": "Time Service",
+      "request": "launch",
+      "mainClass": "com.workforce.time.TimeServiceApplication",
+      "projectName": "time-service"
+    },
+    {
+      "type": "java",
+      "name": "Absence Vacation Service",
+      "request": "launch",
+      "mainClass": "com.workforce.absence.AbsenceVacationServiceApplication",
+      "projectName": "absence-vacation-service"
+    },
+    {
+      "type": "java",
+      "name": "Billing Service",
+      "request": "launch",
+      "mainClass": "com.workforce.billing.BillingServiceApplication",
+      "projectName": "billing-service"
+    },
+    {
+      "type": "java",
+      "name": "Report Media Service",
+      "request": "launch",
+      "mainClass": "com.workforce.report.ReportMediaServiceApplication",
+      "projectName": "report-media-service"
+    }
+  ],
+  "compounds": [
+    {
+      "name": "Alle Services starten",
+      "configurations": [
+        "Auth Service",
+        "User Role Service",
+        "Order Service",
+        "Planning Service",
+        "Time Service",
+        "Absence Vacation Service",
+        "Billing Service",
+        "Report Media Service",
+        "API Gateway"
+      ]
+    }
+  ]
+}

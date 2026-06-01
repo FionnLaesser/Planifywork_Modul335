@@ -1,0 +1,33 @@
+{
+  // Java
+  "java.configuration.updateBuildConfiguration": "automatic",
+  "java.compile.nullAnalysis.mode": "automatic",
+  "spring-boot.ls.java.home": "",
+
+  // Maven – Root-POM als Projekt-POM verwenden
+  "maven.pomfile": "${workspaceFolder}/pom.xml",
+
+  // Flutter
+  "dart.flutterSdkPath": "",
+  "dart.lineLength": 120,
+
+  // Editor
+  "editor.formatOnSave": true,
+  "editor.tabSize": 2,
+  "[java]": {
+    "editor.tabSize": 4,
+    "editor.formatOnSave": true
+  },
+  "[dart]": {
+    "editor.tabSize": 2,
+    "editor.formatOnSave": true
+  },
+
+  // Dateien ausblenden
+  "files.exclude": {
+    "**/target": true,
+    "**/.dart_tool": true,
+    "**/build": true,
+    "**/node_modules": true
+  }
+}

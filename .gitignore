@@ -20,7 +20,7 @@ mobile/pubspec.lock
 mysql-data/
 mongo-data/
 
-# IDE
+# IDE – persönliche Einstellungen ignorieren, gemeinsame committen
 .idea/
 *.iml
-.vscode/
+# .vscode/ wird commitet (extensions, settings, launch configs für das Team)
