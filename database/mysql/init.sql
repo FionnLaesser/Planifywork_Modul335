@@ -132,11 +132,5 @@ CREATE TABLE invoice_positions (
 
 INSERT INTO roles (name) VALUES ('ADMIN'), ('HR'), ('SHIFT_LEAD'), ('EMPLOYEE');
 
--- ── Seed: Test-User (Passwort fuer alle: "password") ─────────────────────────
--- BCrypt-Hash fuer "password" mit Staerke 10
-
-INSERT INTO users (username, email, password, first_name, last_name, role_id, active) VALUES
-('admin',      'admin@workforce.ch',    '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', 'System',  'Admin',     1, true),
-('hr.mueller', 'hr@workforce.ch',       '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', 'Anna',    'Mueller',   2, true),
-('sl.huber',   'sl@workforce.ch',       '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', 'Bruno',   'Huber',     3, true),
-('emp.meier',  'emp@workforce.ch',      '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', 'Clara',   'Meier',     4, true);
+-- Demo-Benutzer werden beim Start des user-role-service automatisch per
+-- CommandLineRunner angelegt (BCrypt-Hash wird live generiert, kein Hardcode).
