@@ -121,6 +121,12 @@ public class UserService {
         if (request.lastName()  != null) user.setLastName(request.lastName());
         if (request.email()     != null) user.setEmail(request.email());
         if (request.active()    != null) user.setActive(request.active());
+        if (request.roleName()  != null) {
+            Role role = roleRepository.findByName(request.roleName())
+                    .orElseThrow(() -> new ResourceNotFoundException(
+                            "Rolle '" + request.roleName() + "' nicht gefunden"));
+            user.setRole(role);
+        }
 
         return UserResponse.from(userRepository.save(user));
     }

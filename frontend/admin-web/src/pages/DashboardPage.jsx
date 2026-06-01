@@ -6,6 +6,7 @@ import {
   PERMISSIONS,
   RESPONSIBILITIES,
 } from '../data/adminSeed';
+import api from '../services/api';
 
 const STORAGE_KEY = 'planifywork-admin-state-v1';
 
@@ -224,6 +225,7 @@ export default function DashboardPage() {
     searchType: 'alle',
   });
   const [editing, setEditing] = useState({});
+  const [apiUsers, setApiUsers] = useState([]);
   const [orderForm, setOrderForm] = useState(emptyOrder);
   const [hrForm, setHrForm] = useState(emptyHr);
   const [conceptForm, setConceptForm] = useState(emptyConcept);
@@ -234,6 +236,19 @@ export default function DashboardPage() {
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   }, [state]);
+
+  const fetchApiUsers = async () => {
+    try {
+      const { data } = await api.get('/api/users');
+      setApiUsers(data);
+    } catch {
+      showMessage('error', 'Benutzer konnten nicht geladen werden.');
+    }
+  };
+
+  useEffect(() => {
+    if (active === 'roles') fetchApiUsers();
+  }, [active]);
 
   const notices = useMemo(() => buildNotices(state), [state]);
 
@@ -474,36 +489,37 @@ export default function DashboardPage() {
     showMessage('success', 'Mitarbeiter gespeichert.');
   };
 
-  const setUserStatus = (user, status) => {
-    const activeAdmins = state.users.filter(item => item.role === 'ADMIN' && item.status === 'aktiv');
-    if (user.role === 'ADMIN' && user.status === 'aktiv' && status !== 'aktiv' && activeAdmins.length <= 1) {
-      showMessage('error', 'Der letzte aktive Admin darf nicht deaktiviert werden.');
-      return;
+  const setUserStatus = async (user, newStatus) => {
+    const isActive = newStatus === 'aktiv';
+    if (!isActive) {
+      const activeAdmins = apiUsers.filter(u => u.roleName === 'ADMIN' && u.active);
+      if (user.roleName === 'ADMIN' && user.active && activeAdmins.length <= 1) {
+        showMessage('error', 'Der letzte aktive Admin darf nicht deaktiviert werden.');
+        return;
+      }
     }
-    commitChange(next => {
-      next.users.find(item => item.id === user.id).status = status;
-    }, {
-      area: 'Rollen',
-      action: 'Benutzerstatus geändert',
-      record: user.name,
-      detail: `Status ${status}`,
-    });
+    try {
+      await api.put(`/api/users/${user.id}`, { active: isActive });
+      showMessage('success', `Benutzer ${isActive ? 'aktiviert' : 'deaktiviert'}.`);
+      fetchApiUsers();
+    } catch {
+      showMessage('error', 'Status konnte nicht geändert werden.');
+    }
   };
 
-  const setUserRole = (user, role) => {
-    const activeAdmins = state.users.filter(item => item.role === 'ADMIN' && item.status === 'aktiv');
-    if (user.role === 'ADMIN' && role !== 'ADMIN' && activeAdmins.length <= 1) {
+  const setUserRole = async (user, role) => {
+    const activeAdmins = apiUsers.filter(u => u.roleName === 'ADMIN' && u.active);
+    if (user.roleName === 'ADMIN' && role !== 'ADMIN' && activeAdmins.length <= 1) {
       showMessage('error', 'Der letzte aktive Admin darf seine Admin-Rolle nicht verlieren.');
       return;
     }
-    commitChange(next => {
-      next.users.find(item => item.id === user.id).role = role;
-    }, {
-      area: 'Rollen',
-      action: 'Rolle geändert',
-      record: user.name,
-      detail: `Neue Rolle ${ROLE_LABELS[role]}`,
-    });
+    try {
+      await api.put(`/api/users/${user.id}`, { roleName: role });
+      showMessage('success', `Rolle auf ${ROLE_LABELS[role]} geändert.`);
+      fetchApiUsers();
+    } catch {
+      showMessage('error', 'Rolle konnte nicht geändert werden.');
+    }
   };
 
   const togglePermission = (role, permission) => {
@@ -1180,18 +1196,24 @@ export default function DashboardPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {state.users.filter(user => matchesSearch(user, search)).map(user => (
+                    {apiUsers.length === 0 && (
+                      <tr><td colSpan={4} style={{ textAlign: 'center', color: '#888', padding: '12px' }}>Keine Benutzer gefunden</td></tr>
+                    )}
+                    {apiUsers.filter(user => matchesSearch(user, search)).map(user => (
                       <tr key={user.id}>
-                        <td>{user.name}<br /><span className="muted">{user.email}</span></td>
                         <td>
-                          <select className="compact-select" value={user.role} onChange={event => setUserRole(user, event.target.value)}>
+                          {user.firstName} {user.lastName}<br />
+                          <span className="muted">{user.username} · {user.email}</span>
+                        </td>
+                        <td>
+                          <select className="compact-select" value={user.roleName} onChange={event => setUserRole(user, event.target.value)}>
                             {ROLES.map(role => <option key={role} value={role}>{ROLE_LABELS[role]}</option>)}
                           </select>
                         </td>
-                        <td><StatusBadge value={user.status} /></td>
+                        <td><StatusBadge value={user.active ? 'aktiv' : 'deaktiviert'} /></td>
                         <td>
-                          <button className={user.status === 'aktiv' ? 'danger-button' : 'secondary-button'} type="button" onClick={() => setUserStatus(user, user.status === 'aktiv' ? 'deaktiviert' : 'aktiv')}>
-                            {user.status === 'aktiv' ? 'Deaktivieren' : 'Aktivieren'}
+                          <button className={user.active ? 'danger-button' : 'secondary-button'} type="button" onClick={() => setUserStatus(user, user.active ? 'deaktiviert' : 'aktiv')}>
+                            {user.active ? 'Deaktivieren' : 'Aktivieren'}
                           </button>
                         </td>
                       </tr>

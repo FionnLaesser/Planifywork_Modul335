@@ -8,10 +8,12 @@ package com.workforce.user.dto;
  * @param lastName  Neuer Nachname (optional)
  * @param email     Neue E-Mail-Adresse (optional)
  * @param active    Aktivierungsstatus – {@code false} deaktiviert den Benutzer
+ * @param roleName  Neuer Rollenname (optional, z.B. "ADMIN", "HR", "SHIFT_LEAD", "EMPLOYEE")
  */
 public record UpdateUserRequest(
         String firstName,
         String lastName,
         String email,
-        Boolean active
+        Boolean active,
+        String roleName
 ) {}
