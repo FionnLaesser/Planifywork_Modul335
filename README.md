@@ -5,6 +5,14 @@ Klasse: Modul 335
 
 ---
 
+## Dokumentation
+
+| Dokument | Beschreibung |
+|---|---|
+| [User Stories – HR](docs/userstories-hr.md) | 10 User Stories mit Akzeptanzkriterien für die HR-Rolle |
+
+---
+
 ## Inhaltsverzeichnis
 
 1. [Projektidee](#1-projektidee)
