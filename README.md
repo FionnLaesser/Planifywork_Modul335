@@ -15,6 +15,7 @@ Klasse: Modul 335
 | [User Stories – Admin](docs/userstories_admin.md) | User Stories mit Akzeptanzkriterien für die Admin-Rolle |
 | [Tests & CI-Pipeline](docs/testing-and-ci.md) | Wie Tests ausgeführt werden, was die CI-Pipeline prüft, was bei Fehlern zu tun ist |
 | [Testbericht](docs/testreport.md) | Ergebnisse des automatischen API-Testlaufs (54/54 Tests bestanden) |
+| [OWASP Top 10 Testplan](docs/owasp-testplan.md) | Sicherheits-Testplan mit OWASP-Kategorien, Befunden, Verbesserungen und offenen Punkten |
 
 ---
 
@@ -23,7 +24,7 @@ Klasse: Modul 335
 ### Voraussetzungen
 
 - **Docker Desktop** installiert und gestartet
-- Ports **3001–3003**, **8000–8008**, **3306**, **27017**, **8080**, **8081** sind frei
+- Ports **3001–3003**, **8000–8008**, **3307**, **27017**, **8080**, **8081** sind frei
 
 ---
 
@@ -661,12 +662,14 @@ Content-Type: application/json
 
 ## 9. Datenbanken
 
-### MySQL · Port 3306
+### MySQL · Host-Port 3307 / Container-Port 3306
 
 Wird verwendet für **alle strukturierten Daten**.
 
 **Datenbank:** `workforce`  
 **Benutzer:** `workforce` / `workforce`
+
+Intern verwenden die Backend-Services weiterhin `mysql-db:3306`. Auf dem Windows-Host ist MySQL über `localhost:3307` erreichbar, damit es keinen Konflikt mit einer lokal installierten Windows-MySQL-Instanz auf Port 3306 gibt.
 
 Tabellen (automatisch angelegt via `database/mysql/init.sql`):
 
@@ -717,7 +720,7 @@ Collection: `media_reports`
 ### Voraussetzungen
 
 - [Docker Desktop](https://www.docker.com/products/docker-desktop/) installiert und gestartet
-- Ports **3001–3003**, **8000–8008**, **3306**, **27017**, **8080**, **8081** sind frei
+- Ports **3001–3003**, **8000–8008**, **3307**, **27017**, **8080**, **8081** sind frei
 - Node.js v18+ nur nötig, wenn Frontends im Entwicklungsmodus (ausserhalb Docker) gestartet werden
 
 ---
@@ -828,7 +831,7 @@ docker compose down -v
 | Admin Web              | 3001  |
 | HR Web                 | 3002  |
 | Schichtleiter Web      | 3003  |
-| MySQL                  | 3306  |
+| MySQL                  | 3307 Host → 3306 Container |
 | MongoDB                | 27017 |
 | phpMyAdmin             | 8080  |
 | Mongo Express          | 8081  |
@@ -842,14 +845,15 @@ Das Kanban-Board findet ihr direkt hier im GitHub-Repository unter dem Tab **Pro
 ### Branch-Strategie
 
 ```
-main                    ← stabiler Stand, nur via Pull Request
-└── feature/<name>      ← jeder arbeitet auf seinem Feature-Branch
+main                    ← stabiler Stand
+└── feature/<name>      ← Feature-Branch für eine Aufgabe
 ```
 
 Beispiele:
 - `feature/time-service-checkin`
 - `feature/hr-web-invoices`
 - `feature/flutter-calendar`
+- `feature/owasp-testplan`
 
 ### Workflow pro Use Case / Kanban-Karte
 
@@ -859,9 +863,10 @@ Beispiele:
    git checkout -b feature/<name>
    ```
 3. Implementieren, committen
-4. Pull Request auf `main` erstellen
-5. Kurze Gegenkontrolle durch eine andere Person (Code Review)
-6. Merge → Karte auf **Done** verschieben
+4. Branch pushen
+5. Pull Request auf `main` erstellen oder nach Absprache direkt in `main` mergen
+6. Kurze Gegenkontrolle durch eine andere Person (Code Review)
+7. Merge → Karte auf **Done** verschieben
 
 ### Commit-Konvention
 
