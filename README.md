@@ -33,7 +33,8 @@ Im Stammverzeichnis des Projekts (`Modul_335_Mobile_Applikation/`) ausführen:
 
 **Erster Start oder nach einem Reset:**
 ```bash
-docker compose down -v && docker compose up --build -d
+docker compose down -v
+docker compose up --build -d
 ```
 
 **Folgestarts** (kein Code geändert, Daten sollen erhalten bleiben):
