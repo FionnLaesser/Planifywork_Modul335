@@ -115,7 +115,20 @@ Alle Frontends verwenden denselben Login-Endpunkt über den API-Gateway (`localh
 
 ---
 
-### Schritt 5 – API direkt testen (optional)
+### Schritt 5 – Automatische API-Tests ausführen
+
+Wenn der Docker-Stack läuft, können die API-Tests aus dem `tests`-Ordner gestartet werden:
+
+```bash
+cd tests
+node api-test.js
+```
+
+Die Tests verwenden den lokalen API-Gateway unter `http://localhost:8000`.
+
+---
+
+### Schritt 6 – API direkt testen (optional)
 
 ```
 POST http://localhost:8000/api/auth/login
