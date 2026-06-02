@@ -129,14 +129,14 @@ export default function AbsencesPage() {
 
   /* ── Render ───────────────────────────────────────────────────────────── */
   return (
-    <div style={{ padding: 32 }}>
-      <Link to="/dashboard" style={{ color: '#555', fontSize: 14 }}>← Dashboard</Link>
+    <div className="hr-page">
+      <Link to="/dashboard" className="back-link">Zurück zum Dashboard</Link>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8, marginBottom: 16 }}>
         <h2 style={{ margin: 0 }}>Absenzen &amp; Ferien</h2>
         <button onClick={openCreate} style={btnPrimary}>+ Absenz erfassen</button>
       </div>
 
-      {error && <p style={{ color: 'red' }}>{error}</p>}
+      {error && <p className="form-error">{error}</p>}
 
       {/* Tabs */}
       <div style={{ display: 'flex', gap: 4, marginBottom: 16, borderBottom: '2px solid #e0e0e0' }}>
@@ -144,8 +144,8 @@ export default function AbsencesPage() {
           <button key={key} onClick={() => setTab(key)} style={{
             padding: '8px 18px', border: 'none', background: 'none', cursor: 'pointer',
             fontWeight: tab === key ? 'bold' : 'normal',
-            borderBottom: tab === key ? '2px solid #0070f3' : '2px solid transparent',
-            marginBottom: -2, color: tab === key ? '#0070f3' : '#333', fontSize: 14,
+            borderBottom: tab === key ? '2px solid #1f7a8c' : '2px solid transparent',
+            marginBottom: -2, color: tab === key ? '#176171' : '#333', fontSize: 14,
           }}>
             {label}
           </button>
@@ -170,7 +170,7 @@ export default function AbsencesPage() {
           </select>
           {(empFilter || typeFilter) && (
             <button onClick={() => { setEmpFilter(''); setTypeFilter(''); }}
-              style={{ fontSize: 13, color: '#888', background: 'none', border: '1px solid #ccc', borderRadius: 4, padding: '4px 10px', cursor: 'pointer' }}>
+              style={{ fontSize: 13, color: '#435161', background: '#fff', border: '1px solid #c8d0d9', borderRadius: 6, padding: '5px 10px', cursor: 'pointer' }}>
               Filter zurücksetzen
             </button>
           )}
@@ -243,12 +243,12 @@ export default function AbsencesPage() {
               value={rejectReason}
               onChange={e => setRejectReason(e.target.value)}
               placeholder="Begründung eingeben..."
-              style={{ width: '100%', height: 90, padding: 8, border: '1px solid #ccc', borderRadius: 4, fontSize: 14, resize: 'vertical', boxSizing: 'border-box' }}
+              style={{ width: '100%', height: 90, padding: 10, border: '1px solid #c8d0d9', borderRadius: 6, fontSize: 14, resize: 'vertical', boxSizing: 'border-box' }}
             />
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 16 }}>
               <button onClick={() => setRejectTarget(null)}>Abbrechen</button>
               <button onClick={confirmReject}
-                style={{ padding: '6px 14px', background: 'red', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer' }}>
+                style={{ padding: '9px 12px', background: '#8a1f11', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontWeight: 650 }}>
                 Ablehnen bestätigen
               </button>
             </div>
@@ -303,7 +303,7 @@ export default function AbsencesPage() {
                 <textarea value={form.reason}
                   onChange={e => setForm({ ...form, reason: e.target.value })}
                   placeholder="z.B. Familienurlaub"
-                  style={{ width: '100%', height: 80, padding: 8, border: '1px solid #ccc', borderRadius: 4, fontSize: 14, resize: 'vertical', boxSizing: 'border-box' }}
+                  style={{ width: '100%', height: 80, padding: 10, border: '1px solid #c8d0d9', borderRadius: 6, fontSize: 14, resize: 'vertical', boxSizing: 'border-box' }}
                 />
               </div>
 
@@ -331,10 +331,10 @@ function Field({ label, value, onChange, type = 'text', required }) {
   );
 }
 
-const inputStyle = { padding: '6px 10px', border: '1px solid #ccc', borderRadius: 4, fontSize: 14 };
-const btnPrimary = { padding: '6px 14px', background: '#0070f3', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 14 };
-const btnSmall   = { background: 'none', border: '1px solid #ccc', borderRadius: 4, padding: '2px 8px', cursor: 'pointer', fontSize: 13 };
-const th = { padding: '10px 12px', textAlign: 'left', fontWeight: 'bold', fontSize: 14 };
-const td = { padding: '10px 12px', fontSize: 14 };
-const overlay = { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 };
-const modal = { background: '#fff', padding: 32, borderRadius: 8, width: 480, maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 4px 24px rgba(0,0,0,0.18)' };
+const inputStyle = { padding: '9px 10px', border: '1px solid #c8d0d9', borderRadius: 6, fontSize: 14, minHeight: 38 };
+const btnPrimary = { padding: '9px 12px', background: '#1f7a8c', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 14, fontWeight: 650 };
+const btnSmall   = { background: '#fff', border: '1px solid #c8d0d9', borderRadius: 6, padding: '5px 9px', cursor: 'pointer', fontSize: 13 };
+const th = { padding: '12px', textAlign: 'left', fontWeight: 700, fontSize: 12 };
+const td = { padding: '12px', fontSize: 14 };
+const overlay = { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(15, 23, 42, 0.48)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: 20 };
+const modal = { background: '#fff', padding: 28, borderRadius: 8, width: 480, maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 12px 36px rgba(18, 32, 42, 0.18)' };

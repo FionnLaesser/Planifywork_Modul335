@@ -25,15 +25,22 @@ export default function LoginPage() {
   };
 
   return (
-    <div style={{ maxWidth: 400, margin: '100px auto', padding: 24 }}>
-      <h2>HR Login</h2>
-      <form onSubmit={handleLogin}>
-        <input placeholder="Benutzername" value={username}
-          onChange={e => setUsername(e.target.value)} style={{ display: 'block', width: '100%', marginBottom: 12 }} />
-        <input type="password" placeholder="Passwort" value={password}
-          onChange={e => setPassword(e.target.value)} style={{ display: 'block', width: '100%', marginBottom: 12 }} />
-        {error && <p style={{ color: 'red' }}>{error}</p>}
-        <button type="submit">Anmelden</button>
+    <div className="login-shell">
+      <form className="login-panel" onSubmit={handleLogin}>
+        <p className="eyebrow">Planifywork HR</p>
+        <h1>HR Login</h1>
+        <label>
+          Benutzername
+          <input placeholder="hr.mueller" value={username}
+            onChange={e => setUsername(e.target.value)} />
+        </label>
+        <label>
+          Passwort
+          <input type="password" placeholder="Passwort" value={password}
+            onChange={e => setPassword(e.target.value)} />
+        </label>
+        {error && <p className="form-error">{error}</p>}
+        <button className="primary-button" type="submit">Anmelden</button>
       </form>
     </div>
   );

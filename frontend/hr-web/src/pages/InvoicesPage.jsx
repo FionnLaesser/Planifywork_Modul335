@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import api from '../services/api';
 
 const STATUS_LABEL = { DRAFT: 'Entwurf', SENT: 'Versendet', PAID: 'Bezahlt' };
-const STATUS_COLOR = { DRAFT: '#888', SENT: '#0070f3', PAID: 'green' };
+const STATUS_COLOR = { DRAFT: '#607080', SENT: '#1f7a8c', PAID: '#14532d' };
 
 export default function InvoicesPage() {
   const [invoices, setInvoices]       = useState([]);
@@ -80,8 +80,8 @@ export default function InvoicesPage() {
   };
 
   return (
-    <div style={{ padding: 32 }}>
-      <Link to="/dashboard" style={{ color: '#555', fontSize: 14 }}>← Dashboard</Link>
+    <div className="hr-page">
+      <Link to="/dashboard" className="back-link">Zurück zum Dashboard</Link>
       <h2 style={{ marginTop: 8 }}>Rechnungen</h2>
 
       <div style={{ display: 'flex', gap: 12, marginBottom: 16 }}>
@@ -96,7 +96,7 @@ export default function InvoicesPage() {
         </button>
       </div>
 
-      {error && <p style={{ color: 'red' }}>{error}</p>}
+      {error && <p className="form-error">{error}</p>}
 
       <table style={{ width: '100%', borderCollapse: 'collapse' }}>
         <thead>
@@ -125,7 +125,7 @@ export default function InvoicesPage() {
               <td style={td}>
                 <button onClick={() => openDetail(inv)} style={{ marginRight: 6 }}>Details</button>
                 {inv.status === 'DRAFT' && (
-                  <button onClick={() => send(inv.id)} style={{ marginRight: 6, color: '#0070f3' }}>Versenden</button>
+                  <button onClick={() => send(inv.id)} style={{ marginRight: 6, color: '#176171' }}>Versenden</button>
                 )}
                 {inv.status === 'SENT' && (
                   <button onClick={() => pay(inv.id)} style={{ color: 'green' }}>Als bezahlt</button>
@@ -176,7 +176,7 @@ export default function InvoicesPage() {
                 </div>
               ))}
               <button type="button" onClick={addPosition}
-                style={{ marginBottom: 16, color: '#0070f3', border: 'none', background: 'none', cursor: 'pointer', padding: 0 }}>
+                style={{ marginBottom: 16, color: '#176171', border: 'none', background: 'none', cursor: 'pointer', padding: 0, fontWeight: 650 }}>
                 + Position hinzufügen
               </button>
 
@@ -237,9 +237,9 @@ export default function InvoicesPage() {
   );
 }
 
-const inputStyle = { padding: '6px 10px', border: '1px solid #ccc', borderRadius: 4, fontSize: 14 };
-const btnPrimary = { padding: '6px 14px', background: '#0070f3', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 14 };
-const th = { padding: '10px 12px', textAlign: 'left', fontWeight: 'bold', fontSize: 14 };
-const td = { padding: '10px 12px', fontSize: 14 };
-const overlay = { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 };
-const modal = { background: '#fff', padding: 32, borderRadius: 8, maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 4px 24px rgba(0,0,0,0.18)' };
+const inputStyle = { padding: '9px 10px', border: '1px solid #c8d0d9', borderRadius: 6, fontSize: 14, minHeight: 38 };
+const btnPrimary = { padding: '9px 12px', background: '#1f7a8c', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 14, fontWeight: 650 };
+const th = { padding: '12px', textAlign: 'left', fontWeight: 700, fontSize: 12 };
+const td = { padding: '12px', fontSize: 14 };
+const overlay = { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(15, 23, 42, 0.48)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: 20 };
+const modal = { background: '#fff', padding: 28, borderRadius: 8, maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 12px 36px rgba(18, 32, 42, 0.18)' };

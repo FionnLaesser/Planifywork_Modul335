@@ -41,10 +41,10 @@ export default function TimePage() {
   useEffect(() => { if (employeeId) loadMonthly(); }, []);
 
   return (
-    <div style={{ padding: 32 }}>
-      <Link to="/dashboard" style={{ color: '#555', fontSize: 14 }}>← Dashboard</Link>
+    <div className="hr-page">
+      <Link to="/dashboard" className="back-link">Zurück zum Dashboard</Link>
       <h2 style={{ marginTop: 8 }}>Stundenübersicht</h2>
-      {error && <p style={{ color: 'red' }}>{error}</p>}
+      {error && <p className="form-error">{error}</p>}
 
       {/* Gesamtstunden */}
       <section style={{ marginBottom: 48 }}>
@@ -139,7 +139,7 @@ export default function TimePage() {
   );
 }
 
-const inputStyle = { padding: '6px 10px', border: '1px solid #ccc', borderRadius: 4, fontSize: 14 };
-const btnPrimary = { padding: '6px 14px', background: '#0070f3', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 14 };
-const th = { padding: '10px 12px', textAlign: 'left', fontWeight: 'bold', fontSize: 14 };
-const td = { padding: '10px 12px', fontSize: 14 };
+const inputStyle = { padding: '9px 10px', border: '1px solid #c8d0d9', borderRadius: 6, fontSize: 14, minHeight: 38 };
+const btnPrimary = { padding: '9px 12px', background: '#1f7a8c', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 14, fontWeight: 650 };
+const th = { padding: '12px', textAlign: 'left', fontWeight: 700, fontSize: 12 };
+const td = { padding: '12px', fontSize: 14 };

@@ -13,16 +13,18 @@ function ProtectedRoute({ children }) {
 
 export default function App() {
   return (
-    <BrowserRouter>
-      <Routes>
-        <Route path="/login"     element={<LoginPage />} />
-        <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
-        <Route path="/users"     element={<ProtectedRoute><UsersPage /></ProtectedRoute>} />
-        <Route path="/time"      element={<ProtectedRoute><TimePage /></ProtectedRoute>} />
-        <Route path="/invoices"  element={<ProtectedRoute><InvoicesPage /></ProtectedRoute>} />
-        <Route path="/absences"  element={<ProtectedRoute><AbsencesPage /></ProtectedRoute>} />
-        <Route path="/"          element={<Navigate to="/dashboard" replace />} />
-      </Routes>
-    </BrowserRouter>
+    <div className="hr-app">
+      <BrowserRouter>
+        <Routes>
+          <Route path="/login"     element={<LoginPage />} />
+          <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
+          <Route path="/users"     element={<ProtectedRoute><UsersPage /></ProtectedRoute>} />
+          <Route path="/time"      element={<ProtectedRoute><TimePage /></ProtectedRoute>} />
+          <Route path="/invoices"  element={<ProtectedRoute><InvoicesPage /></ProtectedRoute>} />
+          <Route path="/absences"  element={<ProtectedRoute><AbsencesPage /></ProtectedRoute>} />
+          <Route path="/"          element={<Navigate to="/dashboard" replace />} />
+        </Routes>
+      </BrowserRouter>
+    </div>
   );
 }
