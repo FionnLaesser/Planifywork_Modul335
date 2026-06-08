@@ -92,6 +92,7 @@ services:
       - absence-vacation-service
       - billing-service
       - report-media-service
+      - flipper-auth-service
     networks:
       - workforce-net
 
@@ -244,6 +245,30 @@ services:
     networks:
       - workforce-net
 
+  flipper-auth-service:
+    build:
+      context: .
+      dockerfile: backend/flipper-auth-service/Dockerfile
+    container_name: flipper-auth-service
+    restart: "no"
+    ports:
+      - "8009:8009"
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql-db:3306/workforce
+      SPRING_DATASOURCE_DRIVER_CLASS_NAME: com.mysql.cj.jdbc.Driver
+      SPRING_DATASOURCE_USERNAME: workforce
+      SPRING_DATASOURCE_PASSWORD: workforce
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+      FLIPPER_AUTH_SEED_DEFAULT_USERS: "false"
+    depends_on:
+      mysql-db:
+        condition: service_healthy
+      user-role-service:
+        condition: service_started
+    networks:
+      - workforce-net
+
   # ── Frontends ──────────────────────────────────────────────────────────────
 
   admin-web:
@@ -273,6 +298,16 @@ services:
     restart: "no"
     ports:
       - "3003:80"
+    networks:
+      - workforce-net
+
+  flipper-auth-web:
+    build:
+      context: ./frontend/flipper-auth-web
+    container_name: flipper-auth-web
+    restart: "no"
+    ports:
+      - "3004:80"
     networks:
       - workforce-net
 
