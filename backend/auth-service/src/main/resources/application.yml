@@ -5,7 +5,7 @@ spring:
   application:
     name: auth-service
   datasource:
-    url: jdbc:mysql://mysql-db:3306/workforce
+    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:workforce}
     username: workforce
     password: workforce
     driver-class-name: com.mysql.cj.jdbc.Driver

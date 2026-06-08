@@ -107,7 +107,9 @@ services:
       - "8001:8001"
     environment:
       SPRING_PROFILES_ACTIVE: docker
-      SPRING_DATASOURCE_URL: jdbc:mysql://mysql-db:3306/workforce
+      DB_HOST: mysql-db
+      DB_PORT: 3306
+      DB_NAME: workforce
       SPRING_DATASOURCE_USERNAME: workforce
       SPRING_DATASOURCE_PASSWORD: workforce
     depends_on:
@@ -126,7 +128,9 @@ services:
       - "8002:8002"
     environment:
       SPRING_PROFILES_ACTIVE: docker
-      SPRING_DATASOURCE_URL: jdbc:mysql://mysql-db:3306/workforce
+      DB_HOST: mysql-db
+      DB_PORT: 3306
+      DB_NAME: workforce
       SPRING_DATASOURCE_USERNAME: workforce
       SPRING_DATASOURCE_PASSWORD: workforce
     depends_on:
@@ -145,7 +149,9 @@ services:
       - "8003:8003"
     environment:
       SPRING_PROFILES_ACTIVE: docker
-      SPRING_DATASOURCE_URL: jdbc:mysql://mysql-db:3306/workforce
+      DB_HOST: mysql-db
+      DB_PORT: 3306
+      DB_NAME: workforce
       SPRING_DATASOURCE_USERNAME: workforce
       SPRING_DATASOURCE_PASSWORD: workforce
     depends_on:
@@ -164,7 +170,9 @@ services:
       - "8004:8004"
     environment:
       SPRING_PROFILES_ACTIVE: docker
-      SPRING_DATASOURCE_URL: jdbc:mysql://mysql-db:3306/workforce
+      DB_HOST: mysql-db
+      DB_PORT: 3306
+      DB_NAME: workforce
       SPRING_DATASOURCE_USERNAME: workforce
       SPRING_DATASOURCE_PASSWORD: workforce
     depends_on:
@@ -183,7 +191,9 @@ services:
       - "8005:8005"
     environment:
       SPRING_PROFILES_ACTIVE: docker
-      SPRING_DATASOURCE_URL: jdbc:mysql://mysql-db:3306/workforce
+      DB_HOST: mysql-db
+      DB_PORT: 3306
+      DB_NAME: workforce
       SPRING_DATASOURCE_USERNAME: workforce
       SPRING_DATASOURCE_PASSWORD: workforce
     depends_on:
@@ -202,7 +212,9 @@ services:
       - "8006:8006"
     environment:
       SPRING_PROFILES_ACTIVE: docker
-      SPRING_DATASOURCE_URL: jdbc:mysql://mysql-db:3306/workforce
+      DB_HOST: mysql-db
+      DB_PORT: 3306
+      DB_NAME: workforce
       SPRING_DATASOURCE_USERNAME: workforce
       SPRING_DATASOURCE_PASSWORD: workforce
     depends_on:
@@ -221,7 +233,9 @@ services:
       - "8007:8007"
     environment:
       SPRING_PROFILES_ACTIVE: docker
-      SPRING_DATASOURCE_URL: jdbc:mysql://mysql-db:3306/workforce
+      DB_HOST: mysql-db
+      DB_PORT: 3306
+      DB_NAME: workforce
       SPRING_DATASOURCE_USERNAME: workforce
       SPRING_DATASOURCE_PASSWORD: workforce
     depends_on:
@@ -256,7 +270,9 @@ services:
       - "8009:8009"
     environment:
       SPRING_PROFILES_ACTIVE: docker
-      SPRING_DATASOURCE_URL: jdbc:mysql://mysql-db:3306/workforce
+      DB_HOST: mysql-db
+      DB_PORT: 3306
+      DB_NAME: workforce
       SPRING_DATASOURCE_DRIVER_CLASS_NAME: com.mysql.cj.jdbc.Driver
       SPRING_DATASOURCE_USERNAME: workforce
       SPRING_DATASOURCE_PASSWORD: workforce
