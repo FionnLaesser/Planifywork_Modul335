@@ -15,7 +15,7 @@ jobs:
 
   # ── Job 1: API-Tests gegen laufende Docker-Infrastruktur ──────────────────
   api-tests:
-    name: API Tests (54 Akzeptanzkriterien)
+    name: API Tests (Auth / User / Planning / Absence / Billing)
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
@@ -91,7 +91,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        app: [hr-web, shiftlead-web]
+        app: [admin-web, hr-web, shiftlead-web]
 
     steps:
       - name: Checkout
