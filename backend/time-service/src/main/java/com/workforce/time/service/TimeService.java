@@ -15,6 +15,7 @@ import java.time.LocalDateTime;
 import java.time.YearMonth;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * Service-Klasse für die Arbeitszeiterfassung und -auswertung.
@@ -72,6 +73,13 @@ public class TimeService {
                 .toList();
     }
 
+    @Transactional(readOnly = true)
+    public Optional<TimeEntryResponse> getCurrentEntry(Long employeeId) {
+        return timeEntryRepository
+                .findFirstByEmployeeIdAndCheckOutIsNullOrderByCheckInDesc(employeeId)
+                .map(TimeEntryResponse::from);
+    }
+
     /**
      * Erfasst einen Check-in für einen Mitarbeiter.
      * Es darf nur ein offener Check-in pro Tag existieren.
@@ -82,10 +90,8 @@ public class TimeService {
      */
     @Transactional
     public TimeEntryResponse checkIn(CheckInRequest request) {
-        LocalDate today = LocalDate.now();
-
         boolean alreadyCheckedIn = timeEntryRepository
-                .findByEmployeeIdAndEntryDateAndCheckOutIsNull(request.employeeId(), today)
+                .findFirstByEmployeeIdAndCheckOutIsNullOrderByCheckInDesc(request.employeeId())
                 .isPresent();
 
         if (alreadyCheckedIn) {
@@ -93,10 +99,11 @@ public class TimeService {
                     "Mitarbeiter " + request.employeeId() + " ist bereits eingecheckt");
         }
 
+        LocalDateTime now = LocalDateTime.now();
         TimeEntry entry = new TimeEntry();
         entry.setEmployeeId(request.employeeId());
-        entry.setCheckIn(LocalDateTime.now());
-        entry.setEntryDate(today);
+        entry.setCheckIn(now);
+        entry.setEntryDate(now.toLocalDate());
 
         return TimeEntryResponse.from(timeEntryRepository.save(entry));
     }
@@ -111,10 +118,8 @@ public class TimeService {
      */
     @Transactional
     public TimeEntryResponse checkOut(CheckOutRequest request) {
-        LocalDate today = LocalDate.now();
-
         TimeEntry entry = timeEntryRepository
-                .findByEmployeeIdAndEntryDateAndCheckOutIsNull(request.employeeId(), today)
+                .findFirstByEmployeeIdAndCheckOutIsNullOrderByCheckInDesc(request.employeeId())
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Kein offener Check-in für Mitarbeiter " + request.employeeId()));
 

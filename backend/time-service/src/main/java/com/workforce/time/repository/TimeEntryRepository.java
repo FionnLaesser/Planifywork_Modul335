@@ -46,6 +46,8 @@ public interface TimeEntryRepository extends JpaRepository<TimeEntry, Long> {
     Optional<TimeEntry> findByEmployeeIdAndEntryDateAndCheckOutIsNull(
             Long employeeId, LocalDate today);
 
+    Optional<TimeEntry> findFirstByEmployeeIdAndCheckOutIsNullOrderByCheckInDesc(Long employeeId);
+
     /**
      * Berechnet die Gesamtstunden aller Mitarbeiter in einem Datumsbereich.
      * Gibt pro Mitarbeiter eine Zeile mit der Summer der Stunden zurück.

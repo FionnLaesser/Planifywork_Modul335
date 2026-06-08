@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * REST-Controller für die Arbeitszeiterfassung und -auswertung.
@@ -69,6 +70,14 @@ public class TimeController {
         int y = year  > 0 ? year  : LocalDate.now().getYear();
 
         return ResponseEntity.ok(timeService.getMonthlyEntries(employeeId, m, y));
+    }
+
+    @GetMapping("/current/{employeeId}")
+    @PreAuthorize("hasAnyRole('EMPLOYEE', 'SHIFT_LEAD', 'HR', 'ADMIN')")
+    public ResponseEntity<TimeEntryResponse> getCurrentEntry(@PathVariable Long employeeId) {
+        Optional<TimeEntryResponse> entry = timeService.getCurrentEntry(employeeId);
+        return entry.map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.noContent().build());
     }
 
     /**
