@@ -390,36 +390,44 @@ export default function DashboardPage() {
 
   const saveHrUser = async event => {
     event.preventDefault();
-    if (!requireValues(hrForm, [
-      ['firstName', 'Vorname'],
-      ['lastName', 'Nachname'],
-      ['username', 'Benutzername'],
-      ['email', 'E-Mail'],
-      ['password', 'Passwort'],
-    ])) return;
+    const requiredFields = editing.hrId
+      ? [['firstName', 'Vorname'], ['lastName', 'Nachname'], ['email', 'E-Mail']]
+      : [['firstName', 'Vorname'], ['lastName', 'Nachname'], ['username', 'Benutzername'], ['email', 'E-Mail'], ['password', 'Passwort']];
+    if (!requireValues(hrForm, requiredFields)) return;
     try {
-      await api.post('/api/users', {
-        firstName: hrForm.firstName,
-        lastName: hrForm.lastName,
-        username: hrForm.username,
-        email: hrForm.email,
-        password: hrForm.password,
-        roleName: 'HR',
-        active: hrForm.status === 'aktiv',
-      });
-      showMessage('success', 'HR-Benutzer angelegt.');
+      if (editing.hrId) {
+        await api.put(`/api/users/${editing.hrId}`, {
+          firstName: hrForm.firstName,
+          lastName: hrForm.lastName,
+          email: hrForm.email,
+          active: hrForm.status === 'aktiv',
+        });
+        showMessage('success', 'HR-Benutzer aktualisiert.');
+      } else {
+        await api.post('/api/users', {
+          firstName: hrForm.firstName,
+          lastName: hrForm.lastName,
+          username: hrForm.username,
+          email: hrForm.email,
+          password: hrForm.password,
+          roleName: 'HR',
+          active: true,
+        });
+        showMessage('success', 'HR-Benutzer angelegt.');
+      }
       setHrForm(emptyHr);
       setEditing(current => ({ ...current, hrId: null }));
       fetchApiHrUsers();
     } catch (err) {
-      const msg = err.response?.data?.message || err.response?.data || 'Fehler beim Anlegen des HR-Benutzers.';
+      const msg = err.response?.data?.message || err.response?.data || 'Fehler beim Speichern des HR-Benutzers.';
       showMessage('error', String(msg));
     }
   };
 
   const editHrUser = user => {
-    setHrForm({ ...emptyHr, ...user });
+    setHrForm({ ...emptyHr, ...user, status: user.active ? 'aktiv' : 'deaktiviert' });
     setEditing(current => ({ ...current, hrId: user.id }));
+    setActive('hr');
   };
 
   const saveConcept = event => {
@@ -507,31 +515,44 @@ export default function DashboardPage() {
 
   const saveEmployee = async event => {
     event.preventDefault();
-    if (!requireValues(employeeForm, [
-      ['firstName', 'Vorname'],
-      ['lastName', 'Nachname'],
-      ['username', 'Benutzername'],
-      ['email', 'E-Mail'],
-      ['password', 'Passwort'],
-    ])) return;
+    const requiredFields = editing.employeeId
+      ? [['firstName', 'Vorname'], ['lastName', 'Nachname'], ['email', 'E-Mail']]
+      : [['firstName', 'Vorname'], ['lastName', 'Nachname'], ['username', 'Benutzername'], ['email', 'E-Mail'], ['password', 'Passwort']];
+    if (!requireValues(employeeForm, requiredFields)) return;
     try {
-      await api.post('/api/users', {
-        firstName: employeeForm.firstName,
-        lastName: employeeForm.lastName,
-        username: employeeForm.username,
-        email: employeeForm.email,
-        password: employeeForm.password,
-        roleName: 'EMPLOYEE',
-        active: employeeForm.status === 'aktiv',
-      });
-      showMessage('success', 'Mitarbeiter angelegt.');
+      if (editing.employeeId) {
+        await api.put(`/api/users/${editing.employeeId}`, {
+          firstName: employeeForm.firstName,
+          lastName: employeeForm.lastName,
+          email: employeeForm.email,
+          active: employeeForm.status === 'aktiv',
+        });
+        showMessage('success', 'Mitarbeiter aktualisiert.');
+      } else {
+        await api.post('/api/users', {
+          firstName: employeeForm.firstName,
+          lastName: employeeForm.lastName,
+          username: employeeForm.username,
+          email: employeeForm.email,
+          password: employeeForm.password,
+          roleName: 'EMPLOYEE',
+          active: true,
+        });
+        showMessage('success', 'Mitarbeiter angelegt.');
+      }
       setEmployeeForm(emptyEmployee);
       setEditing(current => ({ ...current, employeeId: null }));
       fetchApiEmployees();
     } catch (err) {
-      const msg = err.response?.data?.message || err.response?.data || 'Fehler beim Anlegen des Mitarbeiters.';
+      const msg = err.response?.data?.message || err.response?.data || 'Fehler beim Speichern des Mitarbeiters.';
       showMessage('error', String(msg));
     }
+  };
+
+  const editEmployee = employee => {
+    setEmployeeForm({ ...emptyEmployee, ...employee, status: employee.active ? 'aktiv' : 'deaktiviert' });
+    setEditing(current => ({ ...current, employeeId: employee.id }));
+    setActive('employees');
   };
 
   const setUserStatus = async (user, newStatus) => {
@@ -547,6 +568,8 @@ export default function DashboardPage() {
       await api.put(`/api/users/${user.id}`, { active: isActive });
       showMessage('success', `Benutzer ${isActive ? 'aktiviert' : 'deaktiviert'}.`);
       fetchApiUsers();
+      if (user.roleName === 'HR') fetchApiHrUsers();
+      if (user.roleName === 'EMPLOYEE') fetchApiEmployees();
     } catch {
       showMessage('error', 'Status konnte nicht geändert werden.');
     }
@@ -871,9 +894,9 @@ export default function DashboardPage() {
                 <div className="form-grid">
                   <Field label="Vorname"><input value={hrForm.firstName} onChange={event => setHrForm({ ...hrForm, firstName: event.target.value })} /></Field>
                   <Field label="Nachname"><input value={hrForm.lastName} onChange={event => setHrForm({ ...hrForm, lastName: event.target.value })} /></Field>
-                  <Field label="Benutzername"><input value={hrForm.username} onChange={event => setHrForm({ ...hrForm, username: event.target.value })} /></Field>
+                  {!editing.hrId && <Field label="Benutzername"><input value={hrForm.username} onChange={event => setHrForm({ ...hrForm, username: event.target.value })} /></Field>}
                   <Field label="E-Mail"><input type="email" value={hrForm.email} onChange={event => setHrForm({ ...hrForm, email: event.target.value })} /></Field>
-                  <Field label="Passwort"><input type="password" value={hrForm.password} onChange={event => setHrForm({ ...hrForm, password: event.target.value })} /></Field>
+                  {!editing.hrId && <Field label="Passwort"><input type="password" value={hrForm.password} onChange={event => setHrForm({ ...hrForm, password: event.target.value })} /></Field>}
                   <Field label="Status">
                     <select value={hrForm.status} onChange={event => setHrForm({ ...hrForm, status: event.target.value })}>
                       <option value="aktiv">aktiv</option>
@@ -894,11 +917,12 @@ export default function DashboardPage() {
                       <th>Benutzername</th>
                       <th>E-Mail</th>
                       <th>Status</th>
+                      <th>Aktion</th>
                     </tr>
                   </thead>
                   <tbody>
                     {apiHrUsers.length === 0 && (
-                      <tr><td colSpan={4} style={{ textAlign: 'center', color: '#888', padding: '12px' }}>Keine HR-Benutzer gefunden</td></tr>
+                      <tr><td colSpan={5} style={{ textAlign: 'center', color: '#888', padding: '12px' }}>Keine HR-Benutzer gefunden</td></tr>
                     )}
                     {apiHrUsers.filter(user => matchesSearch(user, search)).map(user => (
                       <tr key={user.id}>
@@ -906,6 +930,17 @@ export default function DashboardPage() {
                         <td><span className="muted">{user.username}</span></td>
                         <td>{user.email}</td>
                         <td><StatusBadge value={user.active ? 'aktiv' : 'deaktiviert'} /></td>
+                        <td>
+                          <button className="secondary-button" type="button" onClick={() => editHrUser(user)}>Bearbeiten</button>
+                          <button
+                            className={user.active ? 'danger-button' : 'secondary-button'}
+                            type="button"
+                            style={{ marginLeft: 8 }}
+                            onClick={() => setUserStatus(user, user.active ? 'deaktiviert' : 'aktiv')}
+                          >
+                            {user.active ? 'Deaktivieren' : 'Aktivieren'}
+                          </button>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -1148,9 +1183,9 @@ export default function DashboardPage() {
                 <div className="form-grid">
                   <Field label="Vorname"><input value={employeeForm.firstName} onChange={event => setEmployeeForm({ ...employeeForm, firstName: event.target.value })} /></Field>
                   <Field label="Nachname"><input value={employeeForm.lastName} onChange={event => setEmployeeForm({ ...employeeForm, lastName: event.target.value })} /></Field>
-                  <Field label="Benutzername"><input value={employeeForm.username} onChange={event => setEmployeeForm({ ...employeeForm, username: event.target.value })} /></Field>
+                  {!editing.employeeId && <Field label="Benutzername"><input value={employeeForm.username} onChange={event => setEmployeeForm({ ...employeeForm, username: event.target.value })} /></Field>}
                   <Field label="E-Mail"><input type="email" value={employeeForm.email} onChange={event => setEmployeeForm({ ...employeeForm, email: event.target.value })} /></Field>
-                  <Field label="Passwort"><input type="password" value={employeeForm.password} onChange={event => setEmployeeForm({ ...employeeForm, password: event.target.value })} /></Field>
+                  {!editing.employeeId && <Field label="Passwort"><input type="password" value={employeeForm.password} onChange={event => setEmployeeForm({ ...employeeForm, password: event.target.value })} /></Field>}
                   <Field label="Personalnummer"><input value={employeeForm.personnelNo} onChange={event => setEmployeeForm({ ...employeeForm, personnelNo: event.target.value })} /></Field>
                   <Field label="Konzept">
                     <select value={employeeForm.conceptId} onChange={event => setEmployeeForm({ ...employeeForm, conceptId: event.target.value })}>
@@ -1184,11 +1219,12 @@ export default function DashboardPage() {
                       <th>Benutzername</th>
                       <th>E-Mail</th>
                       <th>Status</th>
+                      <th>Aktion</th>
                     </tr>
                   </thead>
                   <tbody>
                     {apiEmployees.length === 0 && (
-                      <tr><td colSpan={4} style={{ textAlign: 'center', color: '#888', padding: '12px' }}>Keine Mitarbeiter gefunden</td></tr>
+                      <tr><td colSpan={5} style={{ textAlign: 'center', color: '#888', padding: '12px' }}>Keine Mitarbeiter gefunden</td></tr>
                     )}
                     {apiEmployees.filter(e => matchesSearch(e, search)).map(e => (
                       <tr key={e.id}>
@@ -1196,6 +1232,17 @@ export default function DashboardPage() {
                         <td><span className="muted">{e.username}</span></td>
                         <td>{e.email}</td>
                         <td><StatusBadge value={e.active ? 'aktiv' : 'deaktiviert'} /></td>
+                        <td>
+                          <button className="secondary-button" type="button" onClick={() => editEmployee(e)}>Bearbeiten</button>
+                          <button
+                            className={e.active ? 'danger-button' : 'secondary-button'}
+                            type="button"
+                            style={{ marginLeft: 8 }}
+                            onClick={() => setUserStatus(e, e.active ? 'deaktiviert' : 'aktiv')}
+                          >
+                            {e.active ? 'Deaktivieren' : 'Aktivieren'}
+                          </button>
+                        </td>
                       </tr>
                     ))}
                   </tbody>

@@ -590,12 +590,14 @@ Content-Type: application/json
 - Login mit Rollenprüfung `ADMIN`
 - Dashboard mit vollständiger Navigation (Übersicht, Aufträge, HR, Firmenkonzepte, Lohn und Stunden, Mitarbeiter, Rollen, Berichte, Suche, Audit-Log)
 - Rollen-Tab: alle Benutzer aus der DB anzeigen, Rolle ändern, deaktivieren/aktivieren (`GET /api/users`, `PUT /api/users/:id`)
-- HR-Tab: HR-Benutzer aus DB anzeigen und neu anlegen (`GET /api/users?role=HR`, `POST /api/users`)
-- Mitarbeiter-Tab: Mitarbeiter aus DB anzeigen und neu anlegen (`GET /api/users?role=EMPLOYEE`, `POST /api/users`)
+- HR-Tab: HR-Benutzer aus DB anzeigen, anlegen, bearbeiten und deaktivieren/aktivieren (`GET /api/users?role=HR`, `POST /api/users`, `PUT /api/users/:id`)
+- Mitarbeiter-Tab: Mitarbeiter aus DB anzeigen, anlegen, bearbeiten und deaktivieren/aktivieren (`GET /api/users?role=EMPLOYEE`, `POST /api/users`, `PUT /api/users/:id`)
 - Aufträge, Firmenkonzepte, Stunden-/Lohnregeln, Berichte, Audit-Log: lokal im Browser (kein Backend für diese Bereiche noch vorhanden)
 - Suche und Übersichts-Statistiken verwenden echte DB-Daten für Benutzer/Mitarbeiter
 
 > **Hinweis:** Aufträge, Firmenkonzepte, Stunden- und Lohnregeln werden aktuell im `localStorage` des Browsers gespeichert, da die entsprechenden Backend-Services (Order Service, etc.) noch nicht vollständig implementiert sind. Diese Daten sind gerätespezifisch und werden bei `localStorage`-Reset zurückgesetzt.
+
+> **Hinweis Bearbeiten-Formular:** Beim Bearbeiten eines bestehenden HR- oder Mitarbeiter-Benutzers werden Benutzername und Passwort ausgeblendet, da der `PUT /api/users/:id` Endpunkt diese Felder nicht akzeptiert (Benutzername ist eindeutig und unveränderlich; Passwortänderung ist nicht implementiert).
 
 **Noch zu implementieren:**
 - Aufträge über den Order Service speichern (`POST /api/orders`)
