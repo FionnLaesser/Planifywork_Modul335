@@ -16,6 +16,7 @@ Klasse: Modul 335
 | [Tests & CI-Pipeline](docs/testing-and-ci.md) | Wie Tests ausgeführt werden, was die CI-Pipeline prüft, was bei Fehlern zu tun ist |
 | [Testbericht](docs/testreport.md) | Ergebnisse des automatischen API-Testlaufs (54/54 Tests bestanden) |
 | [OWASP Top 10 Testplan](docs/owasp-testplan.md) | Sicherheits-Testplan mit OWASP-Kategorien, Befunden, Verbesserungen und offenen Punkten |
+| [Flipper Auth Integration](docs/flipper-auth-integration.md) | Übernommene Flipper-, HCE-, ESP32- und Auth-Service-Teile |
 
 ---
 
@@ -24,7 +25,7 @@ Klasse: Modul 335
 ### Voraussetzungen
 
 - **Docker Desktop** installiert und gestartet
-- Ports **3001–3003**, **8000–8008**, **3307**, **27017**, **8080**, **8081** sind frei
+- Ports **3001–3004**, **8000–8009**, **3307**, **27017**, **8080**, **8081** sind frei
 
 ---
 
@@ -69,6 +70,7 @@ Seed-User angelegt: emp.meier (EMPLOYEE)
 | **Admin-Frontend** | http://localhost:3001 | Rollen, Benutzerverwaltung, Aufträge |
 | **HR-Frontend** | http://localhost:3002 | Schichtleiter anlegen, Stunden, Rechnungen, Absenzen |
 | **Schichtleiter-Frontend** | http://localhost:3003 | Arbeitspläne, Schichten, Kalender |
+| **Flipper Auth Dashboard** | http://localhost:3004 | Flipper-Login/Logout-Challenges testen |
 | **phpMyAdmin** | http://localhost:8080 | MySQL-Datenbankadmin |
 | **Mongo Express** | http://localhost:8081 | MongoDB-Admin (kein Login nötig) |
 
@@ -722,7 +724,7 @@ Collection: `media_reports`
 ### Voraussetzungen
 
 - [Docker Desktop](https://www.docker.com/products/docker-desktop/) installiert und gestartet
-- Ports **3001–3003**, **8000–8008**, **3307**, **27017**, **8080**, **8081** sind frei
+- Ports **3001–3004**, **8000–8009**, **3307**, **27017**, **8080**, **8081** sind frei
 - Node.js v18+ nur nötig, wenn Frontends im Entwicklungsmodus (ausserhalb Docker) gestartet werden
 
 ---
@@ -811,6 +813,7 @@ docker compose down -v
 | Admin-Frontend | http://localhost:3001 | `admin` / `password` |
 | HR-Frontend | http://localhost:3002 | `hr.mueller` / `password` |
 | Schichtleiter-Frontend | http://localhost:3003 | `sl.huber` / `password` |
+| Flipper Auth Dashboard | http://localhost:3004 | *(kein Login)* |
 | phpMyAdmin | http://localhost:8080 | `workforce` / `workforce` |
 | Mongo Express | http://localhost:8081 | *(kein Login)* |
 | API Gateway | http://localhost:8000 | *(direkte API-Calls)* |
@@ -830,9 +833,11 @@ docker compose down -v
 | Absence/Vacation Svc.  | 8006  |
 | Billing Service        | 8007  |
 | Report/Media Service   | 8008  |
+| Flipper Auth Service   | 8009  |
 | Admin Web              | 3001  |
 | HR Web                 | 3002  |
 | Schichtleiter Web      | 3003  |
+| Flipper Auth Web       | 3004  |
 | MySQL                  | 3307 Host → 3306 Container |
 | MongoDB                | 27017 |
 | phpMyAdmin             | 8080  |
