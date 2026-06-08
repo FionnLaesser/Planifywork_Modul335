@@ -116,6 +116,7 @@ Alle Frontends verwenden denselben Login-Endpunkt über den API-Gateway (`localh
 |---|---|---|
 | Arbeitsplanung | `/planning` | Arbeitspläne erstellen, Schichten hinzufügen, veröffentlichen |
 | Aufträge | `/orders` | Zugewiesene Aufträge aus dem Order Service einsehen und Status ändern |
+| Arbeitszeiten | `/time` | Gesamtstunden und Monatsdetails der Mitarbeiter aus dem Time Service einsehen |
 
 ---
 
@@ -544,14 +545,17 @@ Content-Type: application/json
 
 **Aufgabe:** Check-in / Check-out erfassen, Arbeitsstunden berechnen, Auswertungen bereitstellen.
 
-**Noch zu implementieren:**
+**Implementiert:**
 - `POST /api/time/checkin` – Check-in speichern
-- `POST /api/time/checkout` – Check-out speichern
-- `GET /api/time/today/{employeeId}` – heutiger Eintrag
-- `GET /api/time/month/{employeeId}?month=&year=` – Monatsauswertung
-- `GET /api/time/total/{employeeId}` – Gesamtstunden
+- `POST /api/time/checkout` – Check-out speichern und Netto-Arbeitszeit berechnen
+- `GET /api/time/current/{employeeId}` – aktuell offener Check-in eines Mitarbeiters
+- `GET /api/time/today/{employeeId}` – heutiger Zeiteintrag eines Mitarbeiters
+- `GET /api/time/month/{employeeId}?month=&year=` – Monatsauswertung pro Mitarbeiter
+- `GET /api/time/total?from=&to=` – Gesamtstunden aller Mitarbeiter im Zeitraum
+- `GET /api/time/total/{employeeId}?from=&to=` – Gesamtstunden eines Mitarbeiters im Zeitraum
+- Rollen: HR/Admin für Auswertungen, Schichtleiter für Team-Übersicht, Mitarbeiter für eigenen Check-in/out
 - Entities: `TimeEntry`
-- Berechnung: Tages-, Wochen-, Monatsstunden
+- Berechnung: Netto-Stunden aus Check-in, Check-out und Pausenzeit
 
 ---
 
@@ -559,12 +563,15 @@ Content-Type: application/json
 
 **Aufgabe:** Ferienanfragen und Absenzen verwalten.
 
-**Noch zu implementieren:**
-- `POST /api/absences` – Absenz/Ferienanfrage einreichen (Mitarbeiter)
-- `GET /api/absences/employee/{id}` – eigene Absenzen
+**Implementiert:**
+- `POST /api/absences` – Absenz/Ferienanfrage einreichen (Mitarbeiter, HR, Admin)
+- `GET /api/absences/employee/{employeeId}` – eigene Absenzen/Ferienanfragen für die Mobile App laden
+- `GET /api/absences` – Absenzen nach Mitarbeiter und/oder Typ filtern
 - `GET /api/absences/pending` – offene Anfragen (HR)
 - `PUT /api/absences/{id}/approve` – genehmigen (HR)
 - `PUT /api/absences/{id}/reject` – ablehnen (HR)
+- `PUT /api/absences/{id}` – Abwesenheit bearbeiten (HR/Admin)
+- `DELETE /api/absences/{id}` – Abwesenheit löschen (HR/Admin)
 - Entities: `Absence`
 - Type-Enum: `VACATION`, `SICK`, `OTHER`
 - Status-Enum: `PENDING`, `APPROVED`, `REJECTED`
@@ -665,6 +672,7 @@ note=Rapportfoto Eingang A
 - Arbeitsplan-Erstellung (`/planning`)
 - Schichten hinzufügen inklusive Mitarbeiter-Auswahl, optionaler Auftrag-ID und Notiz
 - Stundenübersicht mit HR-Kontingent, geplanten Stunden, Reststunden und Warnungen
+- Arbeitszeiten-Seite (`/time`) lädt Gesamtstunden und Monatsdetails aus dem Time Service
 - Arbeitsplan veröffentlichen, damit Mitarbeiter die Schichten im Mobile-Kalender sehen
 
 **Implementiert zusätzlich:**
@@ -691,14 +699,12 @@ note=Rapportfoto Eingang A
 | `lib/screens/login_screen.dart` | Login-UI |
 | `lib/screens/home_screen.dart` | Bottom-Navigation mit 4 Tabs |
 | `lib/screens/calendar_screen.dart` | Arbeitskalender mit echten veröffentlichten Schichten aus dem Planning Service |
-| `lib/screens/checkin_screen.dart` | Check-in / Check-out Button |
-| `lib/screens/absence_screen.dart` | Ferienanfrage + Absenz einreichen |
-| `lib/screens/report_screen.dart` | Kamera öffnen, Bild aufnehmen, Hochladen |
+| `lib/screens/checkin_screen.dart` | Check-in / Check-out Button mit Time-Service-Anbindung |
+| `lib/screens/absence_screen.dart` | Ferienanfrage + Absenz mit Datumswahl einreichen und eigene Anfragen anzeigen |
+| `lib/screens/report_screen.dart` | Kamera öffnen, Bild aufnehmen und per Report/Media Service hochladen |
 
 ### Noch zu implementieren
 
-- Check-in/out mit API-Aufruf verbinden
-- Ferienanfrage-Formular mit Datumswahl
 - Auftrags-Daten herunterladen (Order Service)
 - Info-/Rechteanzeige des eigenen Benutzers
 

@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDate;
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
 
@@ -48,6 +49,9 @@ public interface TimeEntryRepository extends JpaRepository<TimeEntry, Long> {
 
     Optional<TimeEntry> findFirstByEmployeeIdAndCheckOutIsNullOrderByCheckInDesc(Long employeeId);
 
+    Optional<TimeEntry> findFirstByEmployeeIdAndEntryDateOrderByCheckInDesc(
+            Long employeeId, LocalDate entryDate);
+
     /**
      * Berechnet die Gesamtstunden aller Mitarbeiter in einem Datumsbereich.
      * Gibt pro Mitarbeiter eine Zeile mit der Summer der Stunden zurück.
@@ -61,6 +65,18 @@ public interface TimeEntryRepository extends JpaRepository<TimeEntry, Long> {
            "WHERE t.entryDate BETWEEN :from AND :to AND t.totalHours IS NOT NULL " +
            "GROUP BY t.employeeId")
     List<Object[]> sumHoursByEmployeeAndDateRange(
+            @Param("from") LocalDate from,
+            @Param("to") LocalDate to);
+
+    /**
+     * Berechnet die Gesamtstunden eines einzelnen Mitarbeiters in einem Datumsbereich.
+     */
+    @Query("SELECT SUM(t.totalHours) FROM TimeEntry t " +
+           "WHERE t.employeeId = :employeeId " +
+           "AND t.entryDate BETWEEN :from AND :to " +
+           "AND t.totalHours IS NOT NULL")
+    BigDecimal sumHoursForEmployeeAndDateRange(
+            @Param("employeeId") Long employeeId,
             @Param("from") LocalDate from,
             @Param("to") LocalDate to);
 }
