@@ -19,8 +19,36 @@ CREATE TABLE users (
     last_name    VARCHAR(100),
     role_id      BIGINT NOT NULL,
     active       BOOLEAN DEFAULT TRUE,
+    flipper_logged_in BOOLEAN NOT NULL DEFAULT FALSE,
     created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (role_id) REFERENCES roles(id)
+);
+
+CREATE TABLE flipper_device (
+    id          BIGINT AUTO_INCREMENT PRIMARY KEY,
+    flipper_id  VARCHAR(100) NOT NULL UNIQUE,
+    user_id     BIGINT NOT NULL,
+    secret      VARCHAR(255) NOT NULL,
+    FOREIGN KEY (user_id) REFERENCES users(id)
+);
+
+CREATE TABLE auth_session (
+    id          BIGINT AUTO_INCREMENT PRIMARY KEY,
+    user_id     BIGINT NOT NULL,
+    challenge   VARCHAR(255) NOT NULL UNIQUE,
+    action      ENUM('LOGIN','LOGOUT') NOT NULL,
+    expires_at  DATETIME(6) NOT NULL,
+    used        BOOLEAN NOT NULL DEFAULT FALSE,
+    success     BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at  DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    FOREIGN KEY (user_id) REFERENCES users(id)
+);
+
+CREATE TABLE used_nonce (
+    id          BIGINT AUTO_INCREMENT PRIMARY KEY,
+    nonce       VARCHAR(255) NOT NULL UNIQUE,
+    flipper_id  VARCHAR(100) NOT NULL,
+    created_at  DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6)
 );
 
 -- ── Orders ───────────────────────────────────────────────────────────────────

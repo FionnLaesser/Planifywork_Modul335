@@ -33,6 +33,7 @@
     <module>backend/absence-vacation-service</module>
     <module>backend/billing-service</module>
     <module>backend/report-media-service</module>
+    <module>backend/flipper-auth-service</module>
   </modules>
 
   <!-- Gemeinsame Dependencies für alle Services -->
