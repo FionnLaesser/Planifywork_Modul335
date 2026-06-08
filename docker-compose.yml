@@ -37,6 +37,7 @@ services:
       - "27017:27017"
     volumes:
       - mongo-data:/data/db
+      - ./database/mongodb/init.js:/docker-entrypoint-initdb.d/init.js:ro
     networks:
       - workforce-net
 
