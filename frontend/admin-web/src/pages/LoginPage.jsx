@@ -8,9 +8,11 @@ export default function LoginPage() {
   const [error, setError]     = useState('');
   const navigate = useNavigate();
 
-  const enterAdmin = (token) => {
-    localStorage.setItem('token', token);
+  const enterAdmin = (data) => {
+    localStorage.setItem('token', data.token);
     localStorage.setItem('role', 'ADMIN');
+    localStorage.setItem('username', data.username || username);
+    if (data.userId != null) localStorage.setItem('userId', String(data.userId));
     navigate('/dashboard');
   };
 
@@ -23,10 +25,11 @@ export default function LoginPage() {
         setError('Kein Admin-Zugang');
         return;
       }
-      enterAdmin(data.token);
+      enterAdmin(data);
     } catch {
       localStorage.removeItem('token');
       localStorage.removeItem('role');
+      localStorage.removeItem('userId');
       setError('Login fehlgeschlagen. Bitte admin / password verwenden und prüfen, ob der API-Gateway läuft.');
     }
   };

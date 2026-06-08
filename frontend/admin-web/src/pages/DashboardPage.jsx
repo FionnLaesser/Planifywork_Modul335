@@ -23,7 +23,7 @@ const NAV_ITEMS = [
   ['audit', 'Audit-Log'],
 ];
 
-const ORDER_STATUSES = ['offen', 'geplant', 'aktiv', 'abgeschlossen', 'storniert'];
+const ORDER_STATUSES = ['offen', 'aktiv', 'abgeschlossen'];
 const ROLES = ['ADMIN', 'HR', 'SHIFT_LEAD', 'EMPLOYEE'];
 
 const ROLE_LABELS = {
@@ -145,6 +145,48 @@ function statusClass(value) {
   return 'neutral';
 }
 
+const ORDER_STATUS_TO_API = {
+  offen: 'OPEN',
+  aktiv: 'IN_PROGRESS',
+  abgeschlossen: 'DONE',
+};
+
+const ORDER_STATUS_FROM_API = {
+  OPEN: 'offen',
+  IN_PROGRESS: 'aktiv',
+  DONE: 'abgeschlossen',
+};
+
+function toApiOrderStatus(value) {
+  return ORDER_STATUS_TO_API[value] || value || 'OPEN';
+}
+
+function toUiOrderStatus(value) {
+  return ORDER_STATUS_FROM_API[value] || value || 'offen';
+}
+
+function toUiOrder(order) {
+  return {
+    id: order.id,
+    title: order.title || '',
+    description: order.description || '',
+    company: order.company || '',
+    location: order.location || '',
+    startDate: order.startDate || '',
+    endDate: order.endDate || '',
+    role: order.requiredRole || '',
+    shiftLead: order.assignedShiftLeadId ? String(order.assignedShiftLeadId) : '',
+    status: toUiOrderStatus(order.status),
+    conceptId: '',
+    employeeIds: order.employeeIds || [],
+  };
+}
+
+function shiftLeadName(id, users) {
+  const user = users.find(item => String(item.id) === String(id));
+  return user ? `#${user.id} ${user.firstName} ${user.lastName}` : 'Nicht zugewiesen';
+}
+
 function formatDateTime(value) {
   return new Intl.DateTimeFormat('de-CH', {
     dateStyle: 'short',
@@ -234,6 +276,8 @@ export default function DashboardPage() {
   const [apiUsers, setApiUsers] = useState([]);
   const [apiEmployees, setApiEmployees] = useState([]);
   const [apiHrUsers, setApiHrUsers] = useState([]);
+  const [apiOrders, setApiOrders] = useState([]);
+  const [apiShiftLeads, setApiShiftLeads] = useState([]);
   const [orderForm, setOrderForm] = useState(emptyOrder);
   const [hrForm, setHrForm] = useState(emptyHr);
   const [conceptForm, setConceptForm] = useState(emptyConcept);
@@ -272,27 +316,50 @@ export default function DashboardPage() {
     }
   };
 
+
+  const fetchApiShiftLeads = async () => {
+    try {
+      const { data } = await api.get('/api/users?role=SHIFT_LEAD');
+      setApiShiftLeads(data);
+    } catch {
+      showMessage('error', 'Schichtleiter konnten nicht geladen werden.');
+    }
+  };
+
+  const fetchApiOrders = async () => {
+    try {
+      const { data } = await api.get('/api/orders');
+      setApiOrders(data.map(toUiOrder));
+    } catch {
+      showMessage('error', 'Aufträge konnten nicht geladen werden.');
+    }
+  };
+
   useEffect(() => {
     if (active === 'roles')     fetchApiUsers();
     if (active === 'employees') fetchApiEmployees();
     if (active === 'hr')        fetchApiHrUsers();
+    if (active === 'orders')    { fetchApiOrders(); fetchApiShiftLeads(); }
   }, [active]);
 
   useEffect(() => {
     fetchApiUsers();
     fetchApiEmployees();
+    fetchApiOrders();
+    fetchApiShiftLeads();
   }, []);
 
   const notices = useMemo(() => buildNotices(state), [state]);
+  const orders = apiOrders.length > 0 ? apiOrders : state.orders;
 
   const stats = useMemo(() => ({
-    openOrders: state.orders.filter(order => !['abgeschlossen', 'storniert'].includes(order.status)).length,
+    openOrders: orders.filter(order => !['abgeschlossen', 'storniert'].includes(order.status)).length,
     activeEmployees: apiEmployees.length > 0
       ? apiEmployees.filter(e => e.active).length
       : state.employees.filter(employee => employee.status === 'aktiv').length,
     timeWarnings: state.timeEntries.filter(entry => entry.status !== 'plausibel').length,
     openAbsences: state.absences.filter(absence => absence.status === 'offen').length,
-  }), [state, apiEmployees]);
+  }), [state, apiEmployees, orders]);
 
   const conceptOptions = state.concepts.map(concept => ({ value: concept.id, label: concept.name }));
 
@@ -325,6 +392,8 @@ export default function DashboardPage() {
   const logout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('role');
+    localStorage.removeItem('username');
+    localStorage.removeItem('userId');
     navigate('/login');
   };
 
@@ -337,7 +406,7 @@ export default function DashboardPage() {
     return true;
   };
 
-  const saveOrder = event => {
+  const saveOrder = async event => {
     event.preventDefault();
     if (!requireValues(orderForm, [
       ['title', 'Titel'],
@@ -352,21 +421,34 @@ export default function DashboardPage() {
       return;
     }
 
-    const id = editing.orderId || makeId('ord');
-    commitChange(next => {
-      const payload = { ...orderForm, id, updatedAt: nowIso() };
-      const index = next.orders.findIndex(order => order.id === id);
-      if (index >= 0) next.orders[index] = payload;
-      else next.orders.unshift(payload);
-    }, {
-      area: 'Aufträge',
-      action: editing.orderId ? 'Aktualisiert' : 'Erstellt',
-      record: orderForm.title,
-      detail: `Status ${orderForm.status}, Schichtleiter ${orderForm.shiftLead || 'nicht zugewiesen'}`,
-    });
-    setOrderForm(emptyOrder);
-    setEditing(current => ({ ...current, orderId: null }));
-    showMessage('success', 'Auftrag gespeichert und für berechtigte Rollen sichtbar.');
+    const payload = {
+      title: orderForm.title,
+      description: orderForm.description || `${orderForm.company} · ${orderForm.location}`,
+      company: orderForm.company,
+      location: orderForm.location,
+      startDate: orderForm.startDate,
+      endDate: orderForm.endDate,
+      requiredRole: orderForm.role,
+      assignedShiftLeadId: orderForm.shiftLead ? Number(orderForm.shiftLead) : null,
+      createdBy: Number(localStorage.getItem('userId')) || null,
+      status: toApiOrderStatus(orderForm.status),
+      employeeIds: orderForm.employeeIds || [],
+    };
+
+    try {
+      if (editing.orderId) {
+        await api.put(`/api/orders/${editing.orderId}`, payload);
+      } else {
+        await api.post('/api/orders', payload);
+      }
+      await fetchApiOrders();
+      setOrderForm(emptyOrder);
+      setEditing(current => ({ ...current, orderId: null }));
+      showMessage('success', editing.orderId ? 'Auftrag aktualisiert.' : 'Auftrag erstellt und für den Schichtleiter sichtbar.');
+    } catch (err) {
+      const msg = err.response?.data?.message || err.response?.data || 'Fehler beim Speichern des Auftrags.';
+      showMessage('error', String(msg));
+    }
   };
 
   const editOrder = order => {
@@ -375,17 +457,15 @@ export default function DashboardPage() {
     setActive('orders');
   };
 
-  const updateOrderStatus = (order, status) => {
-    commitChange(next => {
-      const item = next.orders.find(current => current.id === order.id);
-      item.status = status;
-      item.updatedAt = nowIso();
-    }, {
-      area: 'Aufträge',
-      action: 'Status geändert',
-      record: order.title,
-      detail: `Neuer Status: ${status}`,
-    });
+  const updateOrderStatus = async (order, status) => {
+    try {
+      await api.put(`/api/orders/${order.id}/status`, { status: toApiOrderStatus(status) });
+      await fetchApiOrders();
+      showMessage('success', `Auftragsstatus auf ${status} geändert.`);
+    } catch (err) {
+      const msg = err.response?.data?.message || err.response?.data || 'Status konnte nicht geändert werden.';
+      showMessage('error', String(msg));
+    }
   };
 
   const saveHrUser = async event => {
@@ -615,7 +695,7 @@ export default function DashboardPage() {
     });
   };
 
-  const filteredOrders = state.orders
+  const filteredOrders = orders
     .filter(order => filters.orderStatus === 'alle' || order.status === filters.orderStatus)
     .filter(order => matchesSearch({
       ...order,
@@ -627,7 +707,7 @@ export default function DashboardPage() {
     .filter(entry => matchesSearch({
       ...entry,
       employee: findName(state.employees, entry.employeeId, ''),
-      order: state.orders.find(order => order.id === entry.orderId)?.title || '',
+      order: orders.find(order => String(order.id) === String(entry.orderId))?.title || '',
     }, search));
 
   const filteredAudit = state.auditLogs
@@ -636,21 +716,21 @@ export default function DashboardPage() {
 
   const searchRows = useMemo(() => {
     const rows = [
-      ...state.orders.map(order => ({ type: 'Auftrag', title: order.title, detail: `${order.company}, ${order.status}`, target: 'orders' })),
+      ...orders.map(order => ({ type: 'Auftrag', title: order.title, detail: `${order.company}, ${order.status}`, target: 'orders' })),
       ...apiEmployees.map(e => ({ type: 'Mitarbeiter', title: `${e.firstName} ${e.lastName}`, detail: `${e.username}, ${e.active ? 'aktiv' : 'deaktiviert'}`, target: 'employees' })),
       ...apiHrUsers.map(user => ({ type: 'HR', title: `${user.firstName} ${user.lastName}`, detail: `${user.email}, ${user.active ? 'aktiv' : 'deaktiviert'}`, target: 'hr' })),
-      ...state.reports.map(report => ({ type: 'Rapport', title: findName(state.employees, report.employeeId), detail: `${findName(state.orders, report.orderId, '')}, ${report.status}`, target: 'reports' })),
+      ...state.reports.map(report => ({ type: 'Rapport', title: findName(state.employees, report.employeeId), detail: `${orders.find(order => String(order.id) === String(report.orderId))?.title || ''}, ${report.status}`, target: 'reports' })),
     ];
     return rows
       .filter(row => filters.searchType === 'alle' || row.type === filters.searchType)
       .filter(row => matchesSearch(row, search))
       .sort((a, b) => a.type.localeCompare(b.type) || a.title.localeCompare(b.title));
-  }, [filters.searchType, search, state, apiEmployees, apiHrUsers]);
+  }, [filters.searchType, search, state, apiEmployees, apiHrUsers, orders]);
 
   const reportRows = useMemo(() => {
-    const orderTitle = id => state.orders.find(order => order.id === id)?.title || 'Unbekannt';
+    const orderTitle = id => orders.find(order => String(order.id) === String(id))?.title || 'Unbekannt';
     const rowsByType = {
-      Aufträge: state.orders.map(order => ({
+      Aufträge: orders.map(order => ({
         id: order.id,
         name: order.title,
         status: order.status,
@@ -695,12 +775,12 @@ export default function DashboardPage() {
     return (rowsByType[filters.reportType] || [])
       .filter(row => !filters.reportPeriod || String(row.date).startsWith(filters.reportPeriod))
       .filter(row => matchesSearch(row, search));
-  }, [filters.reportPeriod, filters.reportType, search, state]);
+  }, [filters.reportPeriod, filters.reportType, search, state, orders]);
 
   const exportReport = () => {
     const rows = [
       ['Bereich', 'Name', 'Status', 'Datum'],
-      ...state.orders.map(order => ['Auftrag', order.title, order.status, order.startDate]),
+      ...orders.map(order => ['Auftrag', order.title, order.status, order.startDate]),
       ...state.timeEntries.map(entry => ['Stunden', findName(state.employees, entry.employeeId), entry.status, entry.date]),
       ...state.absences.map(absence => ['Absenz', findName(state.employees, absence.employeeId), absence.status, absence.startDate]),
       ...state.employees.map(employee => ['Mitarbeiter', employee.name, employee.status, employee.personnelNo]),
@@ -820,7 +900,14 @@ export default function DashboardPage() {
                   <Field label="Startdatum"><input type="date" value={orderForm.startDate} onChange={event => setOrderForm({ ...orderForm, startDate: event.target.value })} /></Field>
                   <Field label="Enddatum"><input type="date" value={orderForm.endDate} onChange={event => setOrderForm({ ...orderForm, endDate: event.target.value })} /></Field>
                   <Field label="Zuständige Rolle"><input value={orderForm.role} onChange={event => setOrderForm({ ...orderForm, role: event.target.value })} /></Field>
-                  <Field label="Schichtleiter"><input value={orderForm.shiftLead} onChange={event => setOrderForm({ ...orderForm, shiftLead: event.target.value })} /></Field>
+                  <Field label="Schichtleiter">
+                    <select value={orderForm.shiftLead} onChange={event => setOrderForm({ ...orderForm, shiftLead: event.target.value })}>
+                      <option value="">Nicht zugewiesen</option>
+                      {apiShiftLeads.map(user => (
+                        <option key={user.id} value={user.id}>#{user.id} {user.firstName} {user.lastName}</option>
+                      ))}
+                    </select>
+                  </Field>
                   <Field label="Status">
                     <select value={orderForm.status} onChange={event => setOrderForm({ ...orderForm, status: event.target.value })}>
                       {ORDER_STATUSES.map(status => <option key={status} value={status}>{status}</option>)}
@@ -870,7 +957,7 @@ export default function DashboardPage() {
                             {ORDER_STATUSES.map(status => <option key={status} value={status}>{status}</option>)}
                           </select>
                         </td>
-                        <td>{order.shiftLead || 'Nicht zugewiesen'}</td>
+                        <td>{shiftLeadName(order.shiftLead, apiShiftLeads)}</td>
                         <td>{findName(state.concepts, order.conceptId)}</td>
                         <td><button className="secondary-button" type="button" onClick={() => editOrder(order)}>Bearbeiten</button></td>
                       </tr>

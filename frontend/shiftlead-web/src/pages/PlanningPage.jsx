@@ -27,6 +27,7 @@ export default function PlanningPage() {
   const [workPlans, setWorkPlans] = useState([]);
   const [selectedId, setSelectedId] = useState(null);
   const [employees, setEmployees] = useState([]);
+  const [orders, setOrders] = useState([]);
   const [workPlanForm, setWorkPlanForm] = useState(emptyWorkPlanForm);
   const [shiftForm, setShiftForm] = useState(emptyShiftForm);
   const [loading, setLoading] = useState(false);
@@ -67,9 +68,21 @@ export default function PlanningPage() {
     }
   };
 
+
+  const loadOrders = async () => {
+    if (!shiftLeadId) return;
+    try {
+      const { data } = await api.get('/api/orders', { params: { shiftLeadId } });
+      setOrders(data.filter(order => order.status !== 'DONE'));
+    } catch {
+      setOrders([]);
+    }
+  };
+
   useEffect(() => {
     loadWorkPlans();
     loadEmployees();
+    loadOrders();
   }, []);
 
   const createWorkPlan = async (event) => {
@@ -322,15 +335,28 @@ export default function PlanningPage() {
                         )}
                       </label>
                       <label style={labelStyle}>
-                        Auftrag-ID optional
-                        <input
-                          type="number"
-                          min="1"
-                          value={shiftForm.orderId}
-                          onChange={e => setShiftForm({ ...shiftForm, orderId: e.target.value })}
-                          style={inputStyle}
-                          placeholder="z.B. 1"
-                        />
+                        Auftrag optional
+                        {orders.length > 0 ? (
+                          <select
+                            value={shiftForm.orderId}
+                            onChange={e => setShiftForm({ ...shiftForm, orderId: e.target.value })}
+                            style={inputStyle}
+                          >
+                            <option value="">Kein Auftrag</option>
+                            {orders.map(order => (
+                              <option key={order.id} value={order.id}>#{order.id} {order.title}</option>
+                            ))}
+                          </select>
+                        ) : (
+                          <input
+                            type="number"
+                            min="1"
+                            value={shiftForm.orderId}
+                            onChange={e => setShiftForm({ ...shiftForm, orderId: e.target.value })}
+                            style={inputStyle}
+                            placeholder="z.B. 1"
+                          />
+                        )}
                       </label>
                       <label style={labelStyle}>
                         Datum
@@ -400,7 +426,7 @@ export default function PlanningPage() {
                         <td style={td}>{formatDate(shift.shiftDate)}</td>
                         <td style={td}>{shift.startTime?.slice(0, 5)} – {shift.endTime?.slice(0, 5)}</td>
                         <td style={td}>{employeeName(shift.employeeId, employees)}</td>
-                        <td style={td}>{shift.orderId ? `#${shift.orderId}` : '—'}</td>
+                        <td style={td}>{orderTitle(shift.orderId, orders)}</td>
                         <td style={td}><b>{formatHours(shift.plannedHours)} h</b></td>
                         <td style={td}>{shift.notes || '—'}</td>
                       </tr>
@@ -438,6 +464,12 @@ function Stat({ label, value, tone = 'normal' }) {
 function readError(err, fallback) {
   const message = err?.response?.data?.message || err?.response?.data?.error;
   return message || fallback;
+}
+
+function orderTitle(orderId, orders) {
+  if (!orderId) return '—';
+  const order = orders.find(item => Number(item.id) === Number(orderId));
+  return order ? `#${order.id} ${order.title}` : `#${orderId}`;
 }
 
 function employeeName(employeeId, employees) {

@@ -1,0 +1,2168 @@
+diff --git a/README.md b/README.md
+index 881247a..6a6909c 100644
+--- a/README.md
++++ b/README.md
+@@ -96,7 +96,7 @@ Alle Frontends verwenden denselben Login-Endpunkt über den API-Gateway (`localh
+ | Seite | Funktion |
+ |---|---|
+ | Rollen | Benutzer aus der DB anzeigen, Rolle ändern, deaktivieren/aktivieren |
+-| Aufträge | Aufträge verwalten (lokal) |
++| Aufträge | Aufträge über den Order Service erstellen, bearbeiten, zuweisen und Status ändern |
+ | HR / Mitarbeiter | Übersicht (lokal) |
+ 
+ **HR** → http://localhost:3002
+@@ -113,6 +113,7 @@ Alle Frontends verwenden denselben Login-Endpunkt über den API-Gateway (`localh
+ | Seite | URL | Funktion |
+ |---|---|---|
+ | Arbeitsplanung | `/planning` | Arbeitspläne erstellen, Schichten hinzufügen, veröffentlichen |
++| Aufträge | `/orders` | Zugewiesene Aufträge aus dem Order Service einsehen und Status ändern |
+ 
+ ---
+ 
+@@ -446,15 +447,39 @@ Jede React-App hat dieselbe interne Struktur:
+ 
+ **Aufgabe:** Auftragsmanagement. Admin erstellt Aufträge, Schichtleiter empfangen sie, Mitarbeiter können Auftragsdaten herunterladen.
+ 
+-**Noch zu implementieren:**
+-- `GET /api/orders` – Aufträge auflisten (gefiltert nach Rolle)
++**Implementiert:**
++- `GET /api/orders` – Aufträge auflisten, optional mit `?shiftLeadId=` und `?status=` filtern
++- `GET /api/orders/{id}` – Auftragsdetail anzeigen
+ - `POST /api/orders` – Auftrag erstellen (Admin)
+-- `PUT /api/orders/{id}` – Auftrag bearbeiten
+-- `PUT /api/orders/{id}/assign` – Schichtleiter/Mitarbeiter zuweisen
+-- `GET /api/orders/{id}/download` – Auftragsdaten herunterladen
+-- Entities: `Order`, `OrderEmployee`
++- `PUT /api/orders/{id}` – Auftrag bearbeiten (Admin)
++- `PUT /api/orders/{id}/assign` – Schichtleiter/Mitarbeiter zuweisen (Admin)
++- `PUT /api/orders/{id}/status` – Status ändern (Admin/Schichtleiter)
++- `GET /api/orders/{id}/download` – Auftragsdaten als JSON abrufen
++- Entities: `WorkOrder`, `OrderEmployee`
+ - Status-Enum: `OPEN`, `IN_PROGRESS`, `DONE`
+ 
++**Beispiel: Auftrag erstellen**
++
++```http
++POST http://localhost:8000/api/orders
++Authorization: Bearer <admin-token>
++Content-Type: application/json
++
++{
++  "title": "Umbau Eingang A",
++  "description": "Material prüfen und Rapportbilder hochladen",
++  "company": "Demo AG",
++  "location": "Zürich",
++  "startDate": "2026-06-01",
++  "endDate": "2026-06-30",
++  "requiredRole": "Montage",
++  "assignedShiftLeadId": 3,
++  "createdBy": 1,
++  "status": "OPEN",
++  "employeeIds": [4]
++}
++```
++
+ ---
+ 
+ ### 6.5 Planning Service · Port 8004
+@@ -563,12 +588,26 @@ Content-Type: application/json
+ 
+ **Aufgabe:** Bild-Uploads aus der Mobile App empfangen und in MongoDB speichern.
+ 
+-**Noch zu implementieren:**
+-- `POST /api/media/upload` – Bild hochladen (Multipart)
+-- `GET /api/media/{id}` – Bild abrufen
+-- `GET /api/media/order/{orderId}` – alle Bilder eines Auftrags
+-- MongoDB-Document: `MediaReport` (employeeId, orderId, filename, contentType, storagePath, uploadedAt, metadata)
+-- Dateispeicherung: Lokal im Container oder S3-kompatibel (z.B. MinIO)
++**Implementiert:**
++- `POST /api/media/upload` – Bild aus der Mobile App per Multipart hochladen
++- `GET /api/media/{id}` – Bilddatei aus MongoDB abrufen
++- `GET /api/media/order/{orderId}` – alle Rapportbilder eines Auftrags auflisten
++- `GET /api/media/employee/{employeeId}` – alle Rapportbilder eines Mitarbeiters auflisten
++- MongoDB-Document: `MediaReport` (employeeId, orderId, rapportId, filename, contentType, fileSize, storagePath, uploadedAt, metadata, data)
++- Bilddaten werden direkt in MongoDB gespeichert; maximale Upload-Grösse: 10 MB
++
++**Beispiel: Rapportbild hochladen**
++
++```http
++POST http://localhost:8000/api/media/upload
++Authorization: Bearer <employee-token>
++Content-Type: multipart/form-data
++
++file=<bild.jpg>
++employeeId=4
++orderId=1
++note=Rapportfoto Eingang A
++```
+ 
+ ---
+ 
+@@ -592,15 +631,15 @@ Content-Type: application/json
+ - Rollen-Tab: alle Benutzer aus der DB anzeigen, Rolle ändern, deaktivieren/aktivieren (`GET /api/users`, `PUT /api/users/:id`)
+ - HR-Tab: HR-Benutzer aus DB anzeigen, anlegen, bearbeiten und deaktivieren/aktivieren (`GET /api/users?role=HR`, `POST /api/users`, `PUT /api/users/:id`)
+ - Mitarbeiter-Tab: Mitarbeiter aus DB anzeigen, anlegen, bearbeiten und deaktivieren/aktivieren (`GET /api/users?role=EMPLOYEE`, `POST /api/users`, `PUT /api/users/:id`)
+-- Aufträge, Firmenkonzepte, Stunden-/Lohnregeln, Berichte, Audit-Log: lokal im Browser (kein Backend für diese Bereiche noch vorhanden)
+-- Suche und Übersichts-Statistiken verwenden echte DB-Daten für Benutzer/Mitarbeiter
++- Aufträge: werden über den Order Service gespeichert (`GET/POST/PUT /api/orders`)
++- Firmenkonzepte, Stunden-/Lohnregeln, Berichte, Audit-Log: weiterhin lokal im Browser
++- Suche und Übersichts-Statistiken verwenden echte DB-Daten für Benutzer/Mitarbeiter/Aufträge
+ 
+-> **Hinweis:** Aufträge, Firmenkonzepte, Stunden- und Lohnregeln werden aktuell im `localStorage` des Browsers gespeichert, da die entsprechenden Backend-Services (Order Service, etc.) noch nicht vollständig implementiert sind. Diese Daten sind gerätespezifisch und werden bei `localStorage`-Reset zurückgesetzt.
++> **Hinweis:** Firmenkonzepte, Stunden- und Lohnregeln werden aktuell noch im `localStorage` des Browsers gespeichert. Aufträge sind jetzt backendgestützt und bleiben in MySQL erhalten.
+ 
+ > **Hinweis Bearbeiten-Formular:** Beim Bearbeiten eines bestehenden HR- oder Mitarbeiter-Benutzers werden Benutzername und Passwort ausgeblendet, da der `PUT /api/users/:id` Endpunkt diese Felder nicht akzeptiert (Benutzername ist eindeutig und unveränderlich; Passwortänderung ist nicht implementiert).
+ 
+ **Noch zu implementieren:**
+-- Aufträge über den Order Service speichern (`POST /api/orders`)
+ - Firmendaten-Seite (`/company`)
+ - Stundenübersicht aus dem Time Service laden
+ 
+@@ -626,8 +665,12 @@ Content-Type: application/json
+ - Stundenübersicht mit HR-Kontingent, geplanten Stunden, Reststunden und Warnungen
+ - Arbeitsplan veröffentlichen, damit Mitarbeiter die Schichten im Mobile-Kalender sehen
+ 
++**Implementiert zusätzlich:**
++- Auftrags-Ansicht (`/orders`) lädt zugewiesene Aufträge aus dem Order Service
++- Schichtleiter kann den Auftragsstatus auf `OPEN`, `IN_PROGRESS` oder `DONE` setzen
++- Arbeitsplanung bietet zugewiesene Aufträge als Auswahl für neue Schichten an
++
+ **Vorbereitet:**
+-- Auftrags-Ansicht (`/orders`) als Platzhalter, bis der Order Service echte Auftragsdaten liefert
+ - Notizen-Übersicht (`/notes`) als Platzhalter; Schichtnotizen werden bereits im Arbeitsplan gespeichert
+ 
+ ---
+@@ -654,7 +697,6 @@ Content-Type: application/json
+ 
+ - Check-in/out mit API-Aufruf verbinden
+ - Ferienanfrage-Formular mit Datumswahl
+-- Bild-Upload tatsächlich mit Report Service verbinden
+ - Auftrags-Daten herunterladen (Order Service)
+ - Info-/Rechteanzeige des eigenen Benutzers
+ 
+@@ -679,7 +721,7 @@ Tabellen (automatisch angelegt via `database/mysql/init.sql`):
+ |---|---|
+ | `roles` | ADMIN, HR, SHIFT_LEAD, EMPLOYEE |
+ | `users` | Alle Benutzer mit Rollenzuweisung |
+-| `orders` | Aufträge |
++| `orders` | Aufträge inklusive Firma, Einsatzort, Zeitraum, Status und Schichtleiter-Zuweisung |
+ | `order_employees` | Zuordnung Mitarbeiter ↔ Auftrag |
+ | `work_plans` | Arbeitspläne inkl. HR-Stundenkontingent, Status und Veröffentlichungszeitpunkt |
+ | `shifts` | Einzelschichten mit Mitarbeiter- und optionalem Auftragsbezug |
+@@ -707,9 +749,10 @@ Collection: `media_reports`
+   "filename": "bild_2024_01.jpg",
+   "content_type": "image/jpeg",
+   "file_size": 204800,
+-  "storage_path": "/uploads/...",
++  "storage_path": "mongodb://workforce-media/media_reports/uuid-...",
+   "uploaded_at": "2024-01-15T14:30:00Z",
+-  "metadata": {}
++  "metadata": { "note": "Rapportfoto Eingang A" },
++  "data": "<binary image data>"
+ }
+ ```
+ 
+diff --git a/backend/order-service/pom.xml b/backend/order-service/pom.xml
+index bc43583..4d0dbd7 100644
+--- a/backend/order-service/pom.xml
++++ b/backend/order-service/pom.xml
+@@ -27,6 +27,10 @@
+       <groupId>org.springframework.boot</groupId>
+       <artifactId>spring-boot-starter-data-jpa</artifactId>
+     </dependency>
++    <dependency>
++      <groupId>org.springframework.boot</groupId>
++      <artifactId>spring-boot-starter-validation</artifactId>
++    </dependency>
+     <dependency>
+       <groupId>com.mysql</groupId>
+       <artifactId>mysql-connector-j</artifactId>
+diff --git a/backend/order-service/src/main/java/com/workforce/order/config/JwtAuthFilter.java b/backend/order-service/src/main/java/com/workforce/order/config/JwtAuthFilter.java
+new file mode 100644
+index 0000000..f1f619e
+--- /dev/null
++++ b/backend/order-service/src/main/java/com/workforce/order/config/JwtAuthFilter.java
+@@ -0,0 +1,44 @@
++package com.workforce.order.config;
++
++import jakarta.servlet.FilterChain;
++import jakarta.servlet.ServletException;
++import jakarta.servlet.http.HttpServletRequest;
++import jakarta.servlet.http.HttpServletResponse;
++import lombok.RequiredArgsConstructor;
++import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
++import org.springframework.security.core.authority.SimpleGrantedAuthority;
++import org.springframework.security.core.context.SecurityContextHolder;
++import org.springframework.stereotype.Component;
++import org.springframework.web.filter.OncePerRequestFilter;
++
++import java.io.IOException;
++import java.util.List;
++
++/** Liest das JWT aus dem Authorization-Header und setzt den Security-Context. */
++@Component
++@RequiredArgsConstructor
++public class JwtAuthFilter extends OncePerRequestFilter {
++
++    private final JwtUtil jwtUtil;
++
++    @Override
++    protected void doFilterInternal(HttpServletRequest request,
++                                    HttpServletResponse response,
++                                    FilterChain filterChain) throws ServletException, IOException {
++        String authHeader = request.getHeader("Authorization");
++        if (authHeader != null && authHeader.startsWith("Bearer ")) {
++            String token = authHeader.substring(7);
++            if (jwtUtil.isValid(token)) {
++                String username = jwtUtil.extractUsername(token);
++                String role = jwtUtil.extractRole(token);
++                UsernamePasswordAuthenticationToken auth = new UsernamePasswordAuthenticationToken(
++                        username,
++                        null,
++                        List.of(new SimpleGrantedAuthority("ROLE_" + role))
++                );
++                SecurityContextHolder.getContext().setAuthentication(auth);
++            }
++        }
++        filterChain.doFilter(request, response);
++    }
++}
+diff --git a/backend/order-service/src/main/java/com/workforce/order/config/JwtUtil.java b/backend/order-service/src/main/java/com/workforce/order/config/JwtUtil.java
+new file mode 100644
+index 0000000..be43f6d
+--- /dev/null
++++ b/backend/order-service/src/main/java/com/workforce/order/config/JwtUtil.java
+@@ -0,0 +1,43 @@
++package com.workforce.order.config;
++
++import io.jsonwebtoken.Claims;
++import io.jsonwebtoken.Jwts;
++import io.jsonwebtoken.security.Keys;
++import org.springframework.beans.factory.annotation.Value;
++import org.springframework.stereotype.Component;
++
++import javax.crypto.SecretKey;
++import java.nio.charset.StandardCharsets;
++
++/** Utility zum Validieren und Lesen der JWT-Tokens im Order Service. */
++@Component
++public class JwtUtil {
++
++    @Value("${jwt.secret}")
++    private String secret;
++
++    private SecretKey key() {
++        return Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
++    }
++
++    public boolean isValid(String token) {
++        try {
++            Jwts.parser().verifyWith(key()).build().parseSignedClaims(token);
++            return true;
++        } catch (Exception ex) {
++            return false;
++        }
++    }
++
++    public String extractUsername(String token) {
++        return claims(token).getSubject();
++    }
++
++    public String extractRole(String token) {
++        return claims(token).get("role", String.class);
++    }
++
++    private Claims claims(String token) {
++        return Jwts.parser().verifyWith(key()).build().parseSignedClaims(token).getPayload();
++    }
++}
+diff --git a/backend/order-service/src/main/java/com/workforce/order/config/SecurityConfig.java b/backend/order-service/src/main/java/com/workforce/order/config/SecurityConfig.java
+new file mode 100644
+index 0000000..7c465e2
+--- /dev/null
++++ b/backend/order-service/src/main/java/com/workforce/order/config/SecurityConfig.java
+@@ -0,0 +1,32 @@
++package com.workforce.order.config;
++
++import lombok.RequiredArgsConstructor;
++import org.springframework.context.annotation.Bean;
++import org.springframework.context.annotation.Configuration;
++import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
++import org.springframework.security.config.annotation.web.builders.HttpSecurity;
++import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
++import org.springframework.security.config.http.SessionCreationPolicy;
++import org.springframework.security.web.SecurityFilterChain;
++import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
++
++/** Spring Security Konfiguration für den Order Service. */
++@Configuration
++@EnableWebSecurity
++@EnableMethodSecurity
++@RequiredArgsConstructor
++public class SecurityConfig {
++
++    private final JwtAuthFilter jwtAuthFilter;
++
++    @Bean
++    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
++        http
++                .csrf(csrf -> csrf.disable())
++                .cors(cors -> cors.disable())
++                .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
++                .authorizeHttpRequests(auth -> auth.anyRequest().authenticated())
++                .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
++        return http.build();
++    }
++}
+diff --git a/backend/order-service/src/main/java/com/workforce/order/controller/OrderController.java b/backend/order-service/src/main/java/com/workforce/order/controller/OrderController.java
+new file mode 100644
+index 0000000..b72cb28
+--- /dev/null
++++ b/backend/order-service/src/main/java/com/workforce/order/controller/OrderController.java
+@@ -0,0 +1,65 @@
++package com.workforce.order.controller;
++
++import com.workforce.order.dto.*;
++import com.workforce.order.model.OrderStatus;
++import com.workforce.order.service.OrderService;
++import jakarta.validation.Valid;
++import lombok.RequiredArgsConstructor;
++import org.springframework.http.HttpStatus;
++import org.springframework.http.ResponseEntity;
++import org.springframework.security.access.prepost.PreAuthorize;
++import org.springframework.web.bind.annotation.*;
++
++import java.util.List;
++
++@RestController
++@RequestMapping("/api/orders")
++@RequiredArgsConstructor
++public class OrderController {
++
++    private final OrderService orderService;
++
++    @GetMapping
++    @PreAuthorize("hasAnyRole('ADMIN','HR','SHIFT_LEAD','EMPLOYEE')")
++    public ResponseEntity<List<OrderResponse>> getOrders(
++            @RequestParam(required = false) Long shiftLeadId,
++            @RequestParam(required = false) OrderStatus status) {
++        return ResponseEntity.ok(orderService.getOrders(shiftLeadId, status));
++    }
++
++    @GetMapping("/{id}")
++    @PreAuthorize("hasAnyRole('ADMIN','HR','SHIFT_LEAD','EMPLOYEE')")
++    public ResponseEntity<OrderResponse> getById(@PathVariable Long id) {
++        return ResponseEntity.ok(orderService.getById(id));
++    }
++
++    @PostMapping
++    @PreAuthorize("hasRole('ADMIN')")
++    public ResponseEntity<OrderResponse> create(@Valid @RequestBody CreateOrderRequest request) {
++        return ResponseEntity.status(HttpStatus.CREATED).body(orderService.create(request));
++    }
++
++    @PutMapping("/{id}")
++    @PreAuthorize("hasRole('ADMIN')")
++    public ResponseEntity<OrderResponse> update(@PathVariable Long id, @RequestBody UpdateOrderRequest request) {
++        return ResponseEntity.ok(orderService.update(id, request));
++    }
++
++    @PutMapping("/{id}/assign")
++    @PreAuthorize("hasRole('ADMIN')")
++    public ResponseEntity<OrderResponse> assign(@PathVariable Long id, @RequestBody AssignOrderRequest request) {
++        return ResponseEntity.ok(orderService.assign(id, request));
++    }
++
++    @PutMapping("/{id}/status")
++    @PreAuthorize("hasAnyRole('ADMIN','SHIFT_LEAD')")
++    public ResponseEntity<OrderResponse> updateStatus(@PathVariable Long id, @Valid @RequestBody UpdateOrderStatusRequest request) {
++        return ResponseEntity.ok(orderService.updateStatus(id, request));
++    }
++
++    @GetMapping("/{id}/download")
++    @PreAuthorize("hasAnyRole('ADMIN','HR','SHIFT_LEAD','EMPLOYEE')")
++    public ResponseEntity<OrderResponse> download(@PathVariable Long id) {
++        return ResponseEntity.ok(orderService.getById(id));
++    }
++}
+diff --git a/backend/order-service/src/main/java/com/workforce/order/dto/AssignOrderRequest.java b/backend/order-service/src/main/java/com/workforce/order/dto/AssignOrderRequest.java
+new file mode 100644
+index 0000000..198f323
+--- /dev/null
++++ b/backend/order-service/src/main/java/com/workforce/order/dto/AssignOrderRequest.java
+@@ -0,0 +1,8 @@
++package com.workforce.order.dto;
++
++import java.util.List;
++
++public record AssignOrderRequest(
++        Long shiftLeadId,
++        List<Long> employeeIds
++) {}
+diff --git a/backend/order-service/src/main/java/com/workforce/order/dto/CreateOrderRequest.java b/backend/order-service/src/main/java/com/workforce/order/dto/CreateOrderRequest.java
+new file mode 100644
+index 0000000..da4366b
+--- /dev/null
++++ b/backend/order-service/src/main/java/com/workforce/order/dto/CreateOrderRequest.java
+@@ -0,0 +1,21 @@
++package com.workforce.order.dto;
++
++import com.workforce.order.model.OrderStatus;
++import jakarta.validation.constraints.NotBlank;
++
++import java.time.LocalDate;
++import java.util.List;
++
++public record CreateOrderRequest(
++        @NotBlank String title,
++        String description,
++        String company,
++        String location,
++        LocalDate startDate,
++        LocalDate endDate,
++        String requiredRole,
++        OrderStatus status,
++        Long assignedShiftLeadId,
++        Long createdBy,
++        List<Long> employeeIds
++) {}
+diff --git a/backend/order-service/src/main/java/com/workforce/order/dto/OrderResponse.java b/backend/order-service/src/main/java/com/workforce/order/dto/OrderResponse.java
+new file mode 100644
+index 0000000..ca5dbf1
+--- /dev/null
++++ b/backend/order-service/src/main/java/com/workforce/order/dto/OrderResponse.java
+@@ -0,0 +1,42 @@
++package com.workforce.order.dto;
++
++import com.workforce.order.model.OrderStatus;
++import com.workforce.order.model.WorkOrder;
++
++import java.time.LocalDate;
++import java.time.LocalDateTime;
++import java.util.List;
++
++public record OrderResponse(
++        Long id,
++        String title,
++        String description,
++        String company,
++        String location,
++        LocalDate startDate,
++        LocalDate endDate,
++        String requiredRole,
++        OrderStatus status,
++        Long assignedShiftLeadId,
++        Long createdBy,
++        LocalDateTime createdAt,
++        List<Long> employeeIds
++) {
++    public static OrderResponse from(WorkOrder order, List<Long> employeeIds) {
++        return new OrderResponse(
++                order.getId(),
++                order.getTitle(),
++                order.getDescription(),
++                order.getCompany(),
++                order.getLocation(),
++                order.getStartDate(),
++                order.getEndDate(),
++                order.getRequiredRole(),
++                order.getStatus(),
++                order.getAssignedShiftLeadId(),
++                order.getCreatedBy(),
++                order.getCreatedAt(),
++                employeeIds
++        );
++    }
++}
+diff --git a/backend/order-service/src/main/java/com/workforce/order/dto/UpdateOrderRequest.java b/backend/order-service/src/main/java/com/workforce/order/dto/UpdateOrderRequest.java
+new file mode 100644
+index 0000000..181305e
+--- /dev/null
++++ b/backend/order-service/src/main/java/com/workforce/order/dto/UpdateOrderRequest.java
+@@ -0,0 +1,19 @@
++package com.workforce.order.dto;
++
++import com.workforce.order.model.OrderStatus;
++
++import java.time.LocalDate;
++import java.util.List;
++
++public record UpdateOrderRequest(
++        String title,
++        String description,
++        String company,
++        String location,
++        LocalDate startDate,
++        LocalDate endDate,
++        String requiredRole,
++        OrderStatus status,
++        Long assignedShiftLeadId,
++        List<Long> employeeIds
++) {}
+diff --git a/backend/order-service/src/main/java/com/workforce/order/dto/UpdateOrderStatusRequest.java b/backend/order-service/src/main/java/com/workforce/order/dto/UpdateOrderStatusRequest.java
+new file mode 100644
+index 0000000..ffae4a3
+--- /dev/null
++++ b/backend/order-service/src/main/java/com/workforce/order/dto/UpdateOrderStatusRequest.java
+@@ -0,0 +1,6 @@
++package com.workforce.order.dto;
++
++import com.workforce.order.model.OrderStatus;
++import jakarta.validation.constraints.NotNull;
++
++public record UpdateOrderStatusRequest(@NotNull OrderStatus status) {}
+diff --git a/backend/order-service/src/main/java/com/workforce/order/exception/GlobalExceptionHandler.java b/backend/order-service/src/main/java/com/workforce/order/exception/GlobalExceptionHandler.java
+new file mode 100644
+index 0000000..c4e87fb
+--- /dev/null
++++ b/backend/order-service/src/main/java/com/workforce/order/exception/GlobalExceptionHandler.java
+@@ -0,0 +1,23 @@
++package com.workforce.order.exception;
++
++import org.springframework.http.HttpStatus;
++import org.springframework.http.ResponseEntity;
++import org.springframework.web.bind.MethodArgumentNotValidException;
++import org.springframework.web.bind.annotation.ExceptionHandler;
++import org.springframework.web.bind.annotation.RestControllerAdvice;
++
++import java.util.Map;
++
++@RestControllerAdvice
++public class GlobalExceptionHandler {
++
++    @ExceptionHandler(ResourceNotFoundException.class)
++    public ResponseEntity<Map<String, String>> notFound(ResourceNotFoundException ex) {
++        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("message", ex.getMessage()));
++    }
++
++    @ExceptionHandler({IllegalArgumentException.class, MethodArgumentNotValidException.class})
++    public ResponseEntity<Map<String, String>> badRequest(Exception ex) {
++        return ResponseEntity.badRequest().body(Map.of("message", ex.getMessage()));
++    }
++}
+diff --git a/backend/order-service/src/main/java/com/workforce/order/exception/ResourceNotFoundException.java b/backend/order-service/src/main/java/com/workforce/order/exception/ResourceNotFoundException.java
+new file mode 100644
+index 0000000..45b9fdc
+--- /dev/null
++++ b/backend/order-service/src/main/java/com/workforce/order/exception/ResourceNotFoundException.java
+@@ -0,0 +1,7 @@
++package com.workforce.order.exception;
++
++public class ResourceNotFoundException extends RuntimeException {
++    public ResourceNotFoundException(String message) {
++        super(message);
++    }
++}
+diff --git a/backend/order-service/src/main/java/com/workforce/order/model/OrderEmployee.java b/backend/order-service/src/main/java/com/workforce/order/model/OrderEmployee.java
+new file mode 100644
+index 0000000..dadb237
+--- /dev/null
++++ b/backend/order-service/src/main/java/com/workforce/order/model/OrderEmployee.java
+@@ -0,0 +1,23 @@
++package com.workforce.order.model;
++
++import jakarta.persistence.EmbeddedId;
++import jakarta.persistence.Entity;
++import jakarta.persistence.Table;
++import lombok.Getter;
++import lombok.NoArgsConstructor;
++import lombok.Setter;
++
++@Entity
++@Table(name = "order_employees")
++@Getter
++@Setter
++@NoArgsConstructor
++public class OrderEmployee {
++
++    @EmbeddedId
++    private OrderEmployeeId id;
++
++    public OrderEmployee(Long orderId, Long employeeId) {
++        this.id = new OrderEmployeeId(orderId, employeeId);
++    }
++}
+diff --git a/backend/order-service/src/main/java/com/workforce/order/model/OrderEmployeeId.java b/backend/order-service/src/main/java/com/workforce/order/model/OrderEmployeeId.java
+new file mode 100644
+index 0000000..beb6512
+--- /dev/null
++++ b/backend/order-service/src/main/java/com/workforce/order/model/OrderEmployeeId.java
+@@ -0,0 +1,37 @@
++package com.workforce.order.model;
++
++import jakarta.persistence.Column;
++import jakarta.persistence.Embeddable;
++import lombok.AllArgsConstructor;
++import lombok.Getter;
++import lombok.NoArgsConstructor;
++import lombok.Setter;
++
++import java.io.Serializable;
++import java.util.Objects;
++
++@Embeddable
++@Getter
++@Setter
++@NoArgsConstructor
++@AllArgsConstructor
++public class OrderEmployeeId implements Serializable {
++
++    @Column(name = "order_id")
++    private Long orderId;
++
++    @Column(name = "employee_id")
++    private Long employeeId;
++
++    @Override
++    public boolean equals(Object o) {
++        if (this == o) return true;
++        if (!(o instanceof OrderEmployeeId that)) return false;
++        return Objects.equals(orderId, that.orderId) && Objects.equals(employeeId, that.employeeId);
++    }
++
++    @Override
++    public int hashCode() {
++        return Objects.hash(orderId, employeeId);
++    }
++}
+diff --git a/backend/order-service/src/main/java/com/workforce/order/model/OrderStatus.java b/backend/order-service/src/main/java/com/workforce/order/model/OrderStatus.java
+new file mode 100644
+index 0000000..c25ef34
+--- /dev/null
++++ b/backend/order-service/src/main/java/com/workforce/order/model/OrderStatus.java
+@@ -0,0 +1,7 @@
++package com.workforce.order.model;
++
++public enum OrderStatus {
++    OPEN,
++    IN_PROGRESS,
++    DONE
++}
+diff --git a/backend/order-service/src/main/java/com/workforce/order/model/WorkOrder.java b/backend/order-service/src/main/java/com/workforce/order/model/WorkOrder.java
+new file mode 100644
+index 0000000..d971ed8
+--- /dev/null
++++ b/backend/order-service/src/main/java/com/workforce/order/model/WorkOrder.java
+@@ -0,0 +1,53 @@
++package com.workforce.order.model;
++
++import jakarta.persistence.*;
++import lombok.Getter;
++import lombok.Setter;
++
++import java.time.LocalDate;
++import java.time.LocalDateTime;
++
++@Entity
++@Table(name = "orders")
++@Getter
++@Setter
++public class WorkOrder {
++
++    @Id
++    @GeneratedValue(strategy = GenerationType.IDENTITY)
++    private Long id;
++
++    @Column(nullable = false, length = 200)
++    private String title;
++
++    @Column(columnDefinition = "TEXT")
++    private String description;
++
++    @Column(length = 200)
++    private String company;
++
++    @Column(length = 200)
++    private String location;
++
++    @Column(name = "start_date")
++    private LocalDate startDate;
++
++    @Column(name = "end_date")
++    private LocalDate endDate;
++
++    @Column(name = "required_role", length = 100)
++    private String requiredRole;
++
++    @Enumerated(EnumType.STRING)
++    @Column(nullable = false)
++    private OrderStatus status = OrderStatus.OPEN;
++
++    @Column(name = "assigned_shift_lead_id")
++    private Long assignedShiftLeadId;
++
++    @Column(name = "created_by")
++    private Long createdBy;
++
++    @Column(name = "created_at", insertable = false, updatable = false)
++    private LocalDateTime createdAt;
++}
+diff --git a/backend/order-service/src/main/java/com/workforce/order/repository/OrderEmployeeRepository.java b/backend/order-service/src/main/java/com/workforce/order/repository/OrderEmployeeRepository.java
+new file mode 100644
+index 0000000..7b47bd5
+--- /dev/null
++++ b/backend/order-service/src/main/java/com/workforce/order/repository/OrderEmployeeRepository.java
+@@ -0,0 +1,20 @@
++package com.workforce.order.repository;
++
++import com.workforce.order.model.OrderEmployee;
++import com.workforce.order.model.OrderEmployeeId;
++import org.springframework.data.jpa.repository.JpaRepository;
++import org.springframework.data.jpa.repository.Modifying;
++import org.springframework.data.jpa.repository.Query;
++import org.springframework.data.repository.query.Param;
++
++import java.util.List;
++
++public interface OrderEmployeeRepository extends JpaRepository<OrderEmployee, OrderEmployeeId> {
++
++    @Query("select oe from OrderEmployee oe where oe.id.orderId = :orderId")
++    List<OrderEmployee> findByOrderId(@Param("orderId") Long orderId);
++
++    @Modifying
++    @Query("delete from OrderEmployee oe where oe.id.orderId = :orderId")
++    void deleteByOrderId(@Param("orderId") Long orderId);
++}
+diff --git a/backend/order-service/src/main/java/com/workforce/order/repository/WorkOrderRepository.java b/backend/order-service/src/main/java/com/workforce/order/repository/WorkOrderRepository.java
+new file mode 100644
+index 0000000..c1b5bcd
+--- /dev/null
++++ b/backend/order-service/src/main/java/com/workforce/order/repository/WorkOrderRepository.java
+@@ -0,0 +1,13 @@
++package com.workforce.order.repository;
++
++import com.workforce.order.model.OrderStatus;
++import com.workforce.order.model.WorkOrder;
++import org.springframework.data.jpa.repository.JpaRepository;
++
++import java.util.List;
++
++public interface WorkOrderRepository extends JpaRepository<WorkOrder, Long> {
++    List<WorkOrder> findByAssignedShiftLeadId(Long shiftLeadId);
++    List<WorkOrder> findByStatus(OrderStatus status);
++    List<WorkOrder> findByAssignedShiftLeadIdAndStatus(Long shiftLeadId, OrderStatus status);
++}
+diff --git a/backend/order-service/src/main/java/com/workforce/order/service/OrderService.java b/backend/order-service/src/main/java/com/workforce/order/service/OrderService.java
+new file mode 100644
+index 0000000..9c1c3ac
+--- /dev/null
++++ b/backend/order-service/src/main/java/com/workforce/order/service/OrderService.java
+@@ -0,0 +1,127 @@
++package com.workforce.order.service;
++
++import com.workforce.order.dto.*;
++import com.workforce.order.exception.ResourceNotFoundException;
++import com.workforce.order.model.OrderEmployee;
++import com.workforce.order.model.OrderStatus;
++import com.workforce.order.model.WorkOrder;
++import com.workforce.order.repository.OrderEmployeeRepository;
++import com.workforce.order.repository.WorkOrderRepository;
++import lombok.RequiredArgsConstructor;
++import org.springframework.stereotype.Service;
++import org.springframework.transaction.annotation.Transactional;
++
++import java.util.List;
++
++@Service
++@RequiredArgsConstructor
++public class OrderService {
++
++    private final WorkOrderRepository orderRepository;
++    private final OrderEmployeeRepository orderEmployeeRepository;
++
++    @Transactional(readOnly = true)
++    public List<OrderResponse> getOrders(Long shiftLeadId, OrderStatus status) {
++        List<WorkOrder> orders;
++        if (shiftLeadId != null && status != null) {
++            orders = orderRepository.findByAssignedShiftLeadIdAndStatus(shiftLeadId, status);
++        } else if (shiftLeadId != null) {
++            orders = orderRepository.findByAssignedShiftLeadId(shiftLeadId);
++        } else if (status != null) {
++            orders = orderRepository.findByStatus(status);
++        } else {
++            orders = orderRepository.findAll();
++        }
++        return orders.stream().map(this::toResponse).toList();
++    }
++
++    @Transactional(readOnly = true)
++    public OrderResponse getById(Long id) {
++        return toResponse(findOrder(id));
++    }
++
++    @Transactional
++    public OrderResponse create(CreateOrderRequest request) {
++        validateDates(request.startDate(), request.endDate());
++        WorkOrder order = new WorkOrder();
++        order.setTitle(request.title().trim());
++        order.setDescription(blankToNull(request.description()));
++        order.setCompany(blankToNull(request.company()));
++        order.setLocation(blankToNull(request.location()));
++        order.setStartDate(request.startDate());
++        order.setEndDate(request.endDate());
++        order.setRequiredRole(blankToNull(request.requiredRole()));
++        order.setStatus(request.status() == null ? OrderStatus.OPEN : request.status());
++        order.setAssignedShiftLeadId(request.assignedShiftLeadId());
++        order.setCreatedBy(request.createdBy());
++        WorkOrder saved = orderRepository.save(order);
++        replaceEmployees(saved.getId(), request.employeeIds());
++        return toResponse(saved);
++    }
++
++    @Transactional
++    public OrderResponse update(Long id, UpdateOrderRequest request) {
++        validateDates(request.startDate(), request.endDate());
++        WorkOrder order = findOrder(id);
++        if (request.title() != null && !request.title().isBlank()) order.setTitle(request.title().trim());
++        if (request.description() != null) order.setDescription(blankToNull(request.description()));
++        if (request.company() != null) order.setCompany(blankToNull(request.company()));
++        if (request.location() != null) order.setLocation(blankToNull(request.location()));
++        if (request.startDate() != null) order.setStartDate(request.startDate());
++        if (request.endDate() != null) order.setEndDate(request.endDate());
++        if (request.requiredRole() != null) order.setRequiredRole(blankToNull(request.requiredRole()));
++        if (request.status() != null) order.setStatus(request.status());
++        if (request.assignedShiftLeadId() != null) order.setAssignedShiftLeadId(request.assignedShiftLeadId());
++        WorkOrder saved = orderRepository.save(order);
++        if (request.employeeIds() != null) replaceEmployees(saved.getId(), request.employeeIds());
++        return toResponse(saved);
++    }
++
++    @Transactional
++    public OrderResponse assign(Long id, AssignOrderRequest request) {
++        WorkOrder order = findOrder(id);
++        order.setAssignedShiftLeadId(request.shiftLeadId());
++        WorkOrder saved = orderRepository.save(order);
++        replaceEmployees(saved.getId(), request.employeeIds());
++        return toResponse(saved);
++    }
++
++    @Transactional
++    public OrderResponse updateStatus(Long id, UpdateOrderStatusRequest request) {
++        WorkOrder order = findOrder(id);
++        order.setStatus(request.status());
++        return toResponse(orderRepository.save(order));
++    }
++
++    private WorkOrder findOrder(Long id) {
++        return orderRepository.findById(id)
++                .orElseThrow(() -> new ResourceNotFoundException("Auftrag mit ID " + id + " nicht gefunden"));
++    }
++
++    private void replaceEmployees(Long orderId, List<Long> employeeIds) {
++        orderEmployeeRepository.deleteByOrderId(orderId);
++        if (employeeIds == null) return;
++        employeeIds.stream()
++                .filter(employeeId -> employeeId != null && employeeId > 0)
++                .distinct()
++                .map(employeeId -> new OrderEmployee(orderId, employeeId))
++                .forEach(orderEmployeeRepository::save);
++    }
++
++    private OrderResponse toResponse(WorkOrder order) {
++        List<Long> employeeIds = orderEmployeeRepository.findByOrderId(order.getId()).stream()
++                .map(orderEmployee -> orderEmployee.getId().getEmployeeId())
++                .toList();
++        return OrderResponse.from(order, employeeIds);
++    }
++
++    private void validateDates(java.time.LocalDate start, java.time.LocalDate end) {
++        if (start != null && end != null && start.isAfter(end)) {
++            throw new IllegalArgumentException("Startdatum darf nicht nach dem Enddatum liegen");
++        }
++    }
++
++    private String blankToNull(String value) {
++        return value == null || value.isBlank() ? null : value.trim();
++    }
++}
+diff --git a/backend/report-media-service/src/main/java/com/workforce/report/config/JwtAuthFilter.java b/backend/report-media-service/src/main/java/com/workforce/report/config/JwtAuthFilter.java
+new file mode 100644
+index 0000000..d6824e1
+--- /dev/null
++++ b/backend/report-media-service/src/main/java/com/workforce/report/config/JwtAuthFilter.java
+@@ -0,0 +1,44 @@
++package com.workforce.report.config;
++
++import jakarta.servlet.FilterChain;
++import jakarta.servlet.ServletException;
++import jakarta.servlet.http.HttpServletRequest;
++import jakarta.servlet.http.HttpServletResponse;
++import lombok.RequiredArgsConstructor;
++import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
++import org.springframework.security.core.authority.SimpleGrantedAuthority;
++import org.springframework.security.core.context.SecurityContextHolder;
++import org.springframework.stereotype.Component;
++import org.springframework.web.filter.OncePerRequestFilter;
++
++import java.io.IOException;
++import java.util.List;
++
++/** Liest das JWT aus dem Authorization-Header und setzt den Security-Context. */
++@Component
++@RequiredArgsConstructor
++public class JwtAuthFilter extends OncePerRequestFilter {
++
++    private final JwtUtil jwtUtil;
++
++    @Override
++    protected void doFilterInternal(HttpServletRequest request,
++                                    HttpServletResponse response,
++                                    FilterChain filterChain) throws ServletException, IOException {
++        String authHeader = request.getHeader("Authorization");
++        if (authHeader != null && authHeader.startsWith("Bearer ")) {
++            String token = authHeader.substring(7);
++            if (jwtUtil.isValid(token)) {
++                String username = jwtUtil.extractUsername(token);
++                String role = jwtUtil.extractRole(token);
++                UsernamePasswordAuthenticationToken auth = new UsernamePasswordAuthenticationToken(
++                        username,
++                        null,
++                        List.of(new SimpleGrantedAuthority("ROLE_" + role))
++                );
++                SecurityContextHolder.getContext().setAuthentication(auth);
++            }
++        }
++        filterChain.doFilter(request, response);
++    }
++}
+diff --git a/backend/report-media-service/src/main/java/com/workforce/report/config/JwtUtil.java b/backend/report-media-service/src/main/java/com/workforce/report/config/JwtUtil.java
+new file mode 100644
+index 0000000..4e7fd47
+--- /dev/null
++++ b/backend/report-media-service/src/main/java/com/workforce/report/config/JwtUtil.java
+@@ -0,0 +1,43 @@
++package com.workforce.report.config;
++
++import io.jsonwebtoken.Claims;
++import io.jsonwebtoken.Jwts;
++import io.jsonwebtoken.security.Keys;
++import org.springframework.beans.factory.annotation.Value;
++import org.springframework.stereotype.Component;
++
++import javax.crypto.SecretKey;
++import java.nio.charset.StandardCharsets;
++
++/** Utility zum Validieren und Lesen der JWT-Tokens im Report/Media Service. */
++@Component
++public class JwtUtil {
++
++    @Value("${jwt.secret}")
++    private String secret;
++
++    private SecretKey key() {
++        return Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
++    }
++
++    public boolean isValid(String token) {
++        try {
++            Jwts.parser().verifyWith(key()).build().parseSignedClaims(token);
++            return true;
++        } catch (Exception ex) {
++            return false;
++        }
++    }
++
++    public String extractUsername(String token) {
++        return claims(token).getSubject();
++    }
++
++    public String extractRole(String token) {
++        return claims(token).get("role", String.class);
++    }
++
++    private Claims claims(String token) {
++        return Jwts.parser().verifyWith(key()).build().parseSignedClaims(token).getPayload();
++    }
++}
+diff --git a/backend/report-media-service/src/main/java/com/workforce/report/config/SecurityConfig.java b/backend/report-media-service/src/main/java/com/workforce/report/config/SecurityConfig.java
+new file mode 100644
+index 0000000..d48cf28
+--- /dev/null
++++ b/backend/report-media-service/src/main/java/com/workforce/report/config/SecurityConfig.java
+@@ -0,0 +1,32 @@
++package com.workforce.report.config;
++
++import lombok.RequiredArgsConstructor;
++import org.springframework.context.annotation.Bean;
++import org.springframework.context.annotation.Configuration;
++import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
++import org.springframework.security.config.annotation.web.builders.HttpSecurity;
++import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
++import org.springframework.security.config.http.SessionCreationPolicy;
++import org.springframework.security.web.SecurityFilterChain;
++import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
++
++/** Spring Security Konfiguration für den Report/Media Service. */
++@Configuration
++@EnableWebSecurity
++@EnableMethodSecurity
++@RequiredArgsConstructor
++public class SecurityConfig {
++
++    private final JwtAuthFilter jwtAuthFilter;
++
++    @Bean
++    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
++        http
++                .csrf(csrf -> csrf.disable())
++                .cors(cors -> cors.disable())
++                .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
++                .authorizeHttpRequests(auth -> auth.anyRequest().authenticated())
++                .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
++        return http.build();
++    }
++}
+diff --git a/backend/report-media-service/src/main/java/com/workforce/report/controller/MediaController.java b/backend/report-media-service/src/main/java/com/workforce/report/controller/MediaController.java
+new file mode 100644
+index 0000000..beb860f
+--- /dev/null
++++ b/backend/report-media-service/src/main/java/com/workforce/report/controller/MediaController.java
+@@ -0,0 +1,56 @@
++package com.workforce.report.controller;
++
++import com.workforce.report.dto.MediaReportResponse;
++import com.workforce.report.model.MediaReport;
++import com.workforce.report.service.MediaReportService;
++import lombok.RequiredArgsConstructor;
++import org.springframework.http.CacheControl;
++import org.springframework.http.MediaType;
++import org.springframework.http.ResponseEntity;
++import org.springframework.security.access.prepost.PreAuthorize;
++import org.springframework.web.bind.annotation.*;
++import org.springframework.web.multipart.MultipartFile;
++
++import java.io.IOException;
++import java.util.List;
++import java.util.concurrent.TimeUnit;
++
++@RestController
++@RequestMapping("/api/media")
++@RequiredArgsConstructor
++public class MediaController {
++
++    private final MediaReportService mediaReportService;
++
++    @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
++    @PreAuthorize("hasAnyRole('EMPLOYEE','SHIFT_LEAD','HR','ADMIN')")
++    public ResponseEntity<MediaReportResponse> upload(
++            @RequestPart("file") MultipartFile file,
++            @RequestParam Long employeeId,
++            @RequestParam(required = false) Long orderId,
++            @RequestParam(required = false) String note) throws IOException {
++        return ResponseEntity.status(201).body(mediaReportService.upload(file, employeeId, orderId, note));
++    }
++
++    @GetMapping("/{id}")
++    @PreAuthorize("hasAnyRole('EMPLOYEE','SHIFT_LEAD','HR','ADMIN')")
++    public ResponseEntity<byte[]> getImage(@PathVariable String id) {
++        MediaReport report = mediaReportService.getFile(id);
++        return ResponseEntity.ok()
++                .contentType(MediaType.parseMediaType(report.getContentType()))
++                .cacheControl(CacheControl.maxAge(1, TimeUnit.HOURS))
++                .body(report.getData());
++    }
++
++    @GetMapping("/order/{orderId}")
++    @PreAuthorize("hasAnyRole('SHIFT_LEAD','HR','ADMIN')")
++    public ResponseEntity<List<MediaReportResponse>> byOrder(@PathVariable Long orderId) {
++        return ResponseEntity.ok(mediaReportService.listByOrder(orderId));
++    }
++
++    @GetMapping("/employee/{employeeId}")
++    @PreAuthorize("hasAnyRole('EMPLOYEE','SHIFT_LEAD','HR','ADMIN')")
++    public ResponseEntity<List<MediaReportResponse>> byEmployee(@PathVariable Long employeeId) {
++        return ResponseEntity.ok(mediaReportService.listByEmployee(employeeId));
++    }
++}
+diff --git a/backend/report-media-service/src/main/java/com/workforce/report/dto/MediaReportResponse.java b/backend/report-media-service/src/main/java/com/workforce/report/dto/MediaReportResponse.java
+new file mode 100644
+index 0000000..29d511e
+--- /dev/null
++++ b/backend/report-media-service/src/main/java/com/workforce/report/dto/MediaReportResponse.java
+@@ -0,0 +1,34 @@
++package com.workforce.report.dto;
++
++import com.workforce.report.model.MediaReport;
++
++import java.time.Instant;
++import java.util.Map;
++
++public record MediaReportResponse(
++        String id,
++        Long employeeId,
++        Long orderId,
++        String rapportId,
++        String filename,
++        String contentType,
++        Integer fileSize,
++        String storagePath,
++        Instant uploadedAt,
++        Map<String, Object> metadata
++) {
++    public static MediaReportResponse from(MediaReport report) {
++        return new MediaReportResponse(
++                report.getId(),
++                report.getEmployeeId(),
++                report.getOrderId(),
++                report.getRapportId(),
++                report.getFilename(),
++                report.getContentType(),
++                report.getFileSize(),
++                report.getStoragePath(),
++                report.getUploadedAt(),
++                report.getMetadata()
++        );
++    }
++}
+diff --git a/backend/report-media-service/src/main/java/com/workforce/report/exception/GlobalExceptionHandler.java b/backend/report-media-service/src/main/java/com/workforce/report/exception/GlobalExceptionHandler.java
+new file mode 100644
+index 0000000..24149fe
+--- /dev/null
++++ b/backend/report-media-service/src/main/java/com/workforce/report/exception/GlobalExceptionHandler.java
+@@ -0,0 +1,23 @@
++package com.workforce.report.exception;
++
++import org.springframework.http.HttpStatus;
++import org.springframework.http.ResponseEntity;
++import org.springframework.web.bind.annotation.ExceptionHandler;
++import org.springframework.web.bind.annotation.RestControllerAdvice;
++import org.springframework.web.multipart.MaxUploadSizeExceededException;
++
++import java.util.Map;
++
++@RestControllerAdvice
++public class GlobalExceptionHandler {
++
++    @ExceptionHandler(ResourceNotFoundException.class)
++    public ResponseEntity<Map<String, String>> notFound(ResourceNotFoundException ex) {
++        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("message", ex.getMessage()));
++    }
++
++    @ExceptionHandler({IllegalArgumentException.class, MaxUploadSizeExceededException.class})
++    public ResponseEntity<Map<String, String>> badRequest(Exception ex) {
++        return ResponseEntity.badRequest().body(Map.of("message", ex.getMessage()));
++    }
++}
+diff --git a/backend/report-media-service/src/main/java/com/workforce/report/exception/ResourceNotFoundException.java b/backend/report-media-service/src/main/java/com/workforce/report/exception/ResourceNotFoundException.java
+new file mode 100644
+index 0000000..a9c35dc
+--- /dev/null
++++ b/backend/report-media-service/src/main/java/com/workforce/report/exception/ResourceNotFoundException.java
+@@ -0,0 +1,7 @@
++package com.workforce.report.exception;
++
++public class ResourceNotFoundException extends RuntimeException {
++    public ResourceNotFoundException(String message) {
++        super(message);
++    }
++}
+diff --git a/backend/report-media-service/src/main/java/com/workforce/report/model/MediaReport.java b/backend/report-media-service/src/main/java/com/workforce/report/model/MediaReport.java
+new file mode 100644
+index 0000000..720fe90
+--- /dev/null
++++ b/backend/report-media-service/src/main/java/com/workforce/report/model/MediaReport.java
+@@ -0,0 +1,49 @@
++package com.workforce.report.model;
++
++import lombok.Getter;
++import lombok.Setter;
++import org.springframework.data.annotation.Id;
++import org.springframework.data.mongodb.core.mapping.Document;
++import org.springframework.data.mongodb.core.mapping.Field;
++
++import java.time.Instant;
++import java.util.Map;
++
++@Document(collection = "media_reports")
++@Getter
++@Setter
++public class MediaReport {
++
++    @Id
++    private String id;
++
++    @Field("employee_id")
++    private Long employeeId;
++
++    @Field("order_id")
++    private Long orderId;
++
++    @Field("rapport_id")
++    private String rapportId;
++
++    @Field("filename")
++    private String filename;
++
++    @Field("content_type")
++    private String contentType;
++
++    @Field("file_size")
++    private Integer fileSize;
++
++    @Field("storage_path")
++    private String storagePath;
++
++    @Field("uploaded_at")
++    private Instant uploadedAt;
++
++    @Field("metadata")
++    private Map<String, Object> metadata;
++
++    @Field("data")
++    private byte[] data;
++}
+diff --git a/backend/report-media-service/src/main/java/com/workforce/report/repository/MediaReportRepository.java b/backend/report-media-service/src/main/java/com/workforce/report/repository/MediaReportRepository.java
+new file mode 100644
+index 0000000..b51e897
+--- /dev/null
++++ b/backend/report-media-service/src/main/java/com/workforce/report/repository/MediaReportRepository.java
+@@ -0,0 +1,11 @@
++package com.workforce.report.repository;
++
++import com.workforce.report.model.MediaReport;
++import org.springframework.data.mongodb.repository.MongoRepository;
++
++import java.util.List;
++
++public interface MediaReportRepository extends MongoRepository<MediaReport, String> {
++    List<MediaReport> findByEmployeeIdOrderByUploadedAtDesc(Long employeeId);
++    List<MediaReport> findByOrderIdOrderByUploadedAtDesc(Long orderId);
++}
+diff --git a/backend/report-media-service/src/main/java/com/workforce/report/service/MediaReportService.java b/backend/report-media-service/src/main/java/com/workforce/report/service/MediaReportService.java
+new file mode 100644
+index 0000000..cc8371c
+--- /dev/null
++++ b/backend/report-media-service/src/main/java/com/workforce/report/service/MediaReportService.java
+@@ -0,0 +1,76 @@
++package com.workforce.report.service;
++
++import com.workforce.report.dto.MediaReportResponse;
++import com.workforce.report.exception.ResourceNotFoundException;
++import com.workforce.report.model.MediaReport;
++import com.workforce.report.repository.MediaReportRepository;
++import lombok.RequiredArgsConstructor;
++import org.springframework.stereotype.Service;
++import org.springframework.web.multipart.MultipartFile;
++
++import java.io.IOException;
++import java.time.Instant;
++import java.util.List;
++import java.util.Map;
++import java.util.UUID;
++
++@Service
++@RequiredArgsConstructor
++public class MediaReportService {
++
++    private final MediaReportRepository repository;
++
++    public MediaReportResponse upload(MultipartFile file, Long employeeId, Long orderId, String note) throws IOException {
++        if (employeeId == null || employeeId <= 0) {
++            throw new IllegalArgumentException("employeeId ist erforderlich");
++        }
++        if (file == null || file.isEmpty()) {
++            throw new IllegalArgumentException("Datei ist erforderlich");
++        }
++        String contentType = file.getContentType() == null ? "application/octet-stream" : file.getContentType();
++        if (!contentType.startsWith("image/")) {
++            throw new IllegalArgumentException("Nur Bilddateien sind erlaubt");
++        }
++        if (file.getSize() > 10 * 1024 * 1024) {
++            throw new IllegalArgumentException("Bild ist zu gross. Maximal 10 MB erlaubt");
++        }
++
++        String id = UUID.randomUUID().toString();
++        String originalName = file.getOriginalFilename() == null ? "rapport.jpg" : file.getOriginalFilename();
++
++        MediaReport report = new MediaReport();
++        report.setId(id);
++        report.setEmployeeId(employeeId);
++        report.setOrderId(orderId);
++        report.setRapportId(UUID.randomUUID().toString());
++        report.setFilename(originalName);
++        report.setContentType(contentType);
++        report.setFileSize((int) file.getSize());
++        report.setStoragePath("mongodb://workforce-media/media_reports/" + id);
++        report.setUploadedAt(Instant.now());
++        Map<String, Object> metadata = note == null || note.isBlank()
++                ? Map.of()
++                : Map.of("note", note.trim());
++        report.setMetadata(metadata);
++        report.setData(file.getBytes());
++
++        return MediaReportResponse.from(repository.save(report));
++    }
++
++    public MediaReport getFile(String id) {
++        return repository.findById(id)
++                .orElseThrow(() -> new ResourceNotFoundException("Bild/Rapport mit ID " + id + " nicht gefunden"));
++    }
++
++    public List<MediaReportResponse> listByOrder(Long orderId) {
++        return repository.findByOrderIdOrderByUploadedAtDesc(orderId).stream()
++                .map(MediaReportResponse::from)
++                .toList();
++    }
++
++    public List<MediaReportResponse> listByEmployee(Long employeeId) {
++        return repository.findByEmployeeIdOrderByUploadedAtDesc(employeeId).stream()
++                .map(MediaReportResponse::from)
++                .toList();
++    }
++}
+diff --git a/backend/report-media-service/src/main/resources/application.yml b/backend/report-media-service/src/main/resources/application.yml
+index 9855e8e..125cd56 100644
+--- a/backend/report-media-service/src/main/resources/application.yml
++++ b/backend/report-media-service/src/main/resources/application.yml
+@@ -6,5 +6,9 @@ spring:
+   data:
+     mongodb:
+       uri: mongodb://workforce:workforce@localhost:27017/workforce-media?authSource=admin
++  servlet:
++    multipart:
++      max-file-size: 10MB
++      max-request-size: 12MB
+ jwt:
+   secret: workforce-super-secret-jwt-key-change-in-production-min-256-bits
+diff --git a/database/mongodb/init.js b/database/mongodb/init.js
+index 892bcec..570b637 100644
+--- a/database/mongodb/init.js
++++ b/database/mongodb/init.js
+@@ -12,10 +12,11 @@ db.createCollection('media_reports', {
+         rapport_id:    { bsonType: 'string' },
+         filename:      { bsonType: 'string' },
+         content_type:  { bsonType: 'string' },
+-        file_size:     { bsonType: 'int' },
++        file_size:     { bsonType: ['int', 'long'] },
+         storage_path:  { bsonType: 'string' },
+         uploaded_at:   { bsonType: 'date' },
+-        metadata:      { bsonType: 'object' }
++        metadata:      { bsonType: 'object' },
++        data:          { bsonType: 'binData' }
+       }
+     }
+   }
+diff --git a/database/mysql/init.sql b/database/mysql/init.sql
+index 6d4fe6b..dcad31b 100644
+--- a/database/mysql/init.sql
++++ b/database/mysql/init.sql
+@@ -29,6 +29,11 @@ CREATE TABLE orders (
+     id              BIGINT AUTO_INCREMENT PRIMARY KEY,
+     title           VARCHAR(200) NOT NULL,
+     description     TEXT,
++    company         VARCHAR(200),
++    location        VARCHAR(200),
++    start_date      DATE,
++    end_date        DATE,
++    required_role   VARCHAR(100),
+     status          ENUM('OPEN','IN_PROGRESS','DONE') DEFAULT 'OPEN',
+     assigned_shift_lead_id BIGINT,
+     created_by      BIGINT,
+diff --git a/docker-compose.yml b/docker-compose.yml
+index d0eb80c..4476bb2 100644
+--- a/docker-compose.yml
++++ b/docker-compose.yml
+@@ -37,6 +37,7 @@ services:
+       - "27017:27017"
+     volumes:
+       - mongo-data:/data/db
++      - ./database/mongodb/init.js:/docker-entrypoint-initdb.d/init.js:ro
+     networks:
+       - workforce-net
+ 
+diff --git a/frontend/admin-web/src/pages/DashboardPage.jsx b/frontend/admin-web/src/pages/DashboardPage.jsx
+index 298ecba..d876f64 100644
+--- a/frontend/admin-web/src/pages/DashboardPage.jsx
++++ b/frontend/admin-web/src/pages/DashboardPage.jsx
+@@ -23,7 +23,7 @@ const NAV_ITEMS = [
+   ['audit', 'Audit-Log'],
+ ];
+ 
+-const ORDER_STATUSES = ['offen', 'geplant', 'aktiv', 'abgeschlossen', 'storniert'];
++const ORDER_STATUSES = ['offen', 'aktiv', 'abgeschlossen'];
+ const ROLES = ['ADMIN', 'HR', 'SHIFT_LEAD', 'EMPLOYEE'];
+ 
+ const ROLE_LABELS = {
+@@ -145,6 +145,48 @@ function statusClass(value) {
+   return 'neutral';
+ }
+ 
++const ORDER_STATUS_TO_API = {
++  offen: 'OPEN',
++  aktiv: 'IN_PROGRESS',
++  abgeschlossen: 'DONE',
++};
++
++const ORDER_STATUS_FROM_API = {
++  OPEN: 'offen',
++  IN_PROGRESS: 'aktiv',
++  DONE: 'abgeschlossen',
++};
++
++function toApiOrderStatus(value) {
++  return ORDER_STATUS_TO_API[value] || value || 'OPEN';
++}
++
++function toUiOrderStatus(value) {
++  return ORDER_STATUS_FROM_API[value] || value || 'offen';
++}
++
++function toUiOrder(order) {
++  return {
++    id: order.id,
++    title: order.title || '',
++    description: order.description || '',
++    company: order.company || '',
++    location: order.location || '',
++    startDate: order.startDate || '',
++    endDate: order.endDate || '',
++    role: order.requiredRole || '',
++    shiftLead: order.assignedShiftLeadId ? String(order.assignedShiftLeadId) : '',
++    status: toUiOrderStatus(order.status),
++    conceptId: '',
++    employeeIds: order.employeeIds || [],
++  };
++}
++
++function shiftLeadName(id, users) {
++  const user = users.find(item => String(item.id) === String(id));
++  return user ? `#${user.id} ${user.firstName} ${user.lastName}` : 'Nicht zugewiesen';
++}
++
+ function formatDateTime(value) {
+   return new Intl.DateTimeFormat('de-CH', {
+     dateStyle: 'short',
+@@ -234,6 +276,8 @@ export default function DashboardPage() {
+   const [apiUsers, setApiUsers] = useState([]);
+   const [apiEmployees, setApiEmployees] = useState([]);
+   const [apiHrUsers, setApiHrUsers] = useState([]);
++  const [apiOrders, setApiOrders] = useState([]);
++  const [apiShiftLeads, setApiShiftLeads] = useState([]);
+   const [orderForm, setOrderForm] = useState(emptyOrder);
+   const [hrForm, setHrForm] = useState(emptyHr);
+   const [conceptForm, setConceptForm] = useState(emptyConcept);
+@@ -272,27 +316,50 @@ export default function DashboardPage() {
+     }
+   };
+ 
++
++  const fetchApiShiftLeads = async () => {
++    try {
++      const { data } = await api.get('/api/users?role=SHIFT_LEAD');
++      setApiShiftLeads(data);
++    } catch {
++      showMessage('error', 'Schichtleiter konnten nicht geladen werden.');
++    }
++  };
++
++  const fetchApiOrders = async () => {
++    try {
++      const { data } = await api.get('/api/orders');
++      setApiOrders(data.map(toUiOrder));
++    } catch {
++      showMessage('error', 'Aufträge konnten nicht geladen werden.');
++    }
++  };
++
+   useEffect(() => {
+     if (active === 'roles')     fetchApiUsers();
+     if (active === 'employees') fetchApiEmployees();
+     if (active === 'hr')        fetchApiHrUsers();
++    if (active === 'orders')    { fetchApiOrders(); fetchApiShiftLeads(); }
+   }, [active]);
+ 
+   useEffect(() => {
+     fetchApiUsers();
+     fetchApiEmployees();
++    fetchApiOrders();
++    fetchApiShiftLeads();
+   }, []);
+ 
+   const notices = useMemo(() => buildNotices(state), [state]);
++  const orders = apiOrders.length > 0 ? apiOrders : state.orders;
+ 
+   const stats = useMemo(() => ({
+-    openOrders: state.orders.filter(order => !['abgeschlossen', 'storniert'].includes(order.status)).length,
++    openOrders: orders.filter(order => !['abgeschlossen', 'storniert'].includes(order.status)).length,
+     activeEmployees: apiEmployees.length > 0
+       ? apiEmployees.filter(e => e.active).length
+       : state.employees.filter(employee => employee.status === 'aktiv').length,
+     timeWarnings: state.timeEntries.filter(entry => entry.status !== 'plausibel').length,
+     openAbsences: state.absences.filter(absence => absence.status === 'offen').length,
+-  }), [state, apiEmployees]);
++  }), [state, apiEmployees, orders]);
+ 
+   const conceptOptions = state.concepts.map(concept => ({ value: concept.id, label: concept.name }));
+ 
+@@ -325,6 +392,8 @@ export default function DashboardPage() {
+   const logout = () => {
+     localStorage.removeItem('token');
+     localStorage.removeItem('role');
++    localStorage.removeItem('username');
++    localStorage.removeItem('userId');
+     navigate('/login');
+   };
+ 
+@@ -337,7 +406,7 @@ export default function DashboardPage() {
+     return true;
+   };
+ 
+-  const saveOrder = event => {
++  const saveOrder = async event => {
+     event.preventDefault();
+     if (!requireValues(orderForm, [
+       ['title', 'Titel'],
+@@ -352,21 +421,34 @@ export default function DashboardPage() {
+       return;
+     }
+ 
+-    const id = editing.orderId || makeId('ord');
+-    commitChange(next => {
+-      const payload = { ...orderForm, id, updatedAt: nowIso() };
+-      const index = next.orders.findIndex(order => order.id === id);
+-      if (index >= 0) next.orders[index] = payload;
+-      else next.orders.unshift(payload);
+-    }, {
+-      area: 'Aufträge',
+-      action: editing.orderId ? 'Aktualisiert' : 'Erstellt',
+-      record: orderForm.title,
+-      detail: `Status ${orderForm.status}, Schichtleiter ${orderForm.shiftLead || 'nicht zugewiesen'}`,
+-    });
+-    setOrderForm(emptyOrder);
+-    setEditing(current => ({ ...current, orderId: null }));
+-    showMessage('success', 'Auftrag gespeichert und für berechtigte Rollen sichtbar.');
++    const payload = {
++      title: orderForm.title,
++      description: orderForm.description || `${orderForm.company} · ${orderForm.location}`,
++      company: orderForm.company,
++      location: orderForm.location,
++      startDate: orderForm.startDate,
++      endDate: orderForm.endDate,
++      requiredRole: orderForm.role,
++      assignedShiftLeadId: orderForm.shiftLead ? Number(orderForm.shiftLead) : null,
++      createdBy: Number(localStorage.getItem('userId')) || null,
++      status: toApiOrderStatus(orderForm.status),
++      employeeIds: orderForm.employeeIds || [],
++    };
++
++    try {
++      if (editing.orderId) {
++        await api.put(`/api/orders/${editing.orderId}`, payload);
++      } else {
++        await api.post('/api/orders', payload);
++      }
++      await fetchApiOrders();
++      setOrderForm(emptyOrder);
++      setEditing(current => ({ ...current, orderId: null }));
++      showMessage('success', editing.orderId ? 'Auftrag aktualisiert.' : 'Auftrag erstellt und für den Schichtleiter sichtbar.');
++    } catch (err) {
++      const msg = err.response?.data?.message || err.response?.data || 'Fehler beim Speichern des Auftrags.';
++      showMessage('error', String(msg));
++    }
+   };
+ 
+   const editOrder = order => {
+@@ -375,17 +457,15 @@ export default function DashboardPage() {
+     setActive('orders');
+   };
+ 
+-  const updateOrderStatus = (order, status) => {
+-    commitChange(next => {
+-      const item = next.orders.find(current => current.id === order.id);
+-      item.status = status;
+-      item.updatedAt = nowIso();
+-    }, {
+-      area: 'Aufträge',
+-      action: 'Status geändert',
+-      record: order.title,
+-      detail: `Neuer Status: ${status}`,
+-    });
++  const updateOrderStatus = async (order, status) => {
++    try {
++      await api.put(`/api/orders/${order.id}/status`, { status: toApiOrderStatus(status) });
++      await fetchApiOrders();
++      showMessage('success', `Auftragsstatus auf ${status} geändert.`);
++    } catch (err) {
++      const msg = err.response?.data?.message || err.response?.data || 'Status konnte nicht geändert werden.';
++      showMessage('error', String(msg));
++    }
+   };
+ 
+   const saveHrUser = async event => {
+@@ -615,7 +695,7 @@ export default function DashboardPage() {
+     });
+   };
+ 
+-  const filteredOrders = state.orders
++  const filteredOrders = orders
+     .filter(order => filters.orderStatus === 'alle' || order.status === filters.orderStatus)
+     .filter(order => matchesSearch({
+       ...order,
+@@ -627,7 +707,7 @@ export default function DashboardPage() {
+     .filter(entry => matchesSearch({
+       ...entry,
+       employee: findName(state.employees, entry.employeeId, ''),
+-      order: state.orders.find(order => order.id === entry.orderId)?.title || '',
++      order: orders.find(order => String(order.id) === String(entry.orderId))?.title || '',
+     }, search));
+ 
+   const filteredAudit = state.auditLogs
+@@ -636,21 +716,21 @@ export default function DashboardPage() {
+ 
+   const searchRows = useMemo(() => {
+     const rows = [
+-      ...state.orders.map(order => ({ type: 'Auftrag', title: order.title, detail: `${order.company}, ${order.status}`, target: 'orders' })),
++      ...orders.map(order => ({ type: 'Auftrag', title: order.title, detail: `${order.company}, ${order.status}`, target: 'orders' })),
+       ...apiEmployees.map(e => ({ type: 'Mitarbeiter', title: `${e.firstName} ${e.lastName}`, detail: `${e.username}, ${e.active ? 'aktiv' : 'deaktiviert'}`, target: 'employees' })),
+       ...apiHrUsers.map(user => ({ type: 'HR', title: `${user.firstName} ${user.lastName}`, detail: `${user.email}, ${user.active ? 'aktiv' : 'deaktiviert'}`, target: 'hr' })),
+-      ...state.reports.map(report => ({ type: 'Rapport', title: findName(state.employees, report.employeeId), detail: `${findName(state.orders, report.orderId, '')}, ${report.status}`, target: 'reports' })),
++      ...state.reports.map(report => ({ type: 'Rapport', title: findName(state.employees, report.employeeId), detail: `${orders.find(order => String(order.id) === String(report.orderId))?.title || ''}, ${report.status}`, target: 'reports' })),
+     ];
+     return rows
+       .filter(row => filters.searchType === 'alle' || row.type === filters.searchType)
+       .filter(row => matchesSearch(row, search))
+       .sort((a, b) => a.type.localeCompare(b.type) || a.title.localeCompare(b.title));
+-  }, [filters.searchType, search, state, apiEmployees, apiHrUsers]);
++  }, [filters.searchType, search, state, apiEmployees, apiHrUsers, orders]);
+ 
+   const reportRows = useMemo(() => {
+-    const orderTitle = id => state.orders.find(order => order.id === id)?.title || 'Unbekannt';
++    const orderTitle = id => orders.find(order => String(order.id) === String(id))?.title || 'Unbekannt';
+     const rowsByType = {
+-      Aufträge: state.orders.map(order => ({
++      Aufträge: orders.map(order => ({
+         id: order.id,
+         name: order.title,
+         status: order.status,
+@@ -695,12 +775,12 @@ export default function DashboardPage() {
+     return (rowsByType[filters.reportType] || [])
+       .filter(row => !filters.reportPeriod || String(row.date).startsWith(filters.reportPeriod))
+       .filter(row => matchesSearch(row, search));
+-  }, [filters.reportPeriod, filters.reportType, search, state]);
++  }, [filters.reportPeriod, filters.reportType, search, state, orders]);
+ 
+   const exportReport = () => {
+     const rows = [
+       ['Bereich', 'Name', 'Status', 'Datum'],
+-      ...state.orders.map(order => ['Auftrag', order.title, order.status, order.startDate]),
++      ...orders.map(order => ['Auftrag', order.title, order.status, order.startDate]),
+       ...state.timeEntries.map(entry => ['Stunden', findName(state.employees, entry.employeeId), entry.status, entry.date]),
+       ...state.absences.map(absence => ['Absenz', findName(state.employees, absence.employeeId), absence.status, absence.startDate]),
+       ...state.employees.map(employee => ['Mitarbeiter', employee.name, employee.status, employee.personnelNo]),
+@@ -820,7 +900,14 @@ export default function DashboardPage() {
+                   <Field label="Startdatum"><input type="date" value={orderForm.startDate} onChange={event => setOrderForm({ ...orderForm, startDate: event.target.value })} /></Field>
+                   <Field label="Enddatum"><input type="date" value={orderForm.endDate} onChange={event => setOrderForm({ ...orderForm, endDate: event.target.value })} /></Field>
+                   <Field label="Zuständige Rolle"><input value={orderForm.role} onChange={event => setOrderForm({ ...orderForm, role: event.target.value })} /></Field>
+-                  <Field label="Schichtleiter"><input value={orderForm.shiftLead} onChange={event => setOrderForm({ ...orderForm, shiftLead: event.target.value })} /></Field>
++                  <Field label="Schichtleiter">
++                    <select value={orderForm.shiftLead} onChange={event => setOrderForm({ ...orderForm, shiftLead: event.target.value })}>
++                      <option value="">Nicht zugewiesen</option>
++                      {apiShiftLeads.map(user => (
++                        <option key={user.id} value={user.id}>#{user.id} {user.firstName} {user.lastName}</option>
++                      ))}
++                    </select>
++                  </Field>
+                   <Field label="Status">
+                     <select value={orderForm.status} onChange={event => setOrderForm({ ...orderForm, status: event.target.value })}>
+                       {ORDER_STATUSES.map(status => <option key={status} value={status}>{status}</option>)}
+@@ -870,7 +957,7 @@ export default function DashboardPage() {
+                             {ORDER_STATUSES.map(status => <option key={status} value={status}>{status}</option>)}
+                           </select>
+                         </td>
+-                        <td>{order.shiftLead || 'Nicht zugewiesen'}</td>
++                        <td>{shiftLeadName(order.shiftLead, apiShiftLeads)}</td>
+                         <td>{findName(state.concepts, order.conceptId)}</td>
+                         <td><button className="secondary-button" type="button" onClick={() => editOrder(order)}>Bearbeiten</button></td>
+                       </tr>
+diff --git a/frontend/admin-web/src/pages/LoginPage.jsx b/frontend/admin-web/src/pages/LoginPage.jsx
+index de43567..d2f7c3d 100644
+--- a/frontend/admin-web/src/pages/LoginPage.jsx
++++ b/frontend/admin-web/src/pages/LoginPage.jsx
+@@ -8,9 +8,11 @@ export default function LoginPage() {
+   const [error, setError]     = useState('');
+   const navigate = useNavigate();
+ 
+-  const enterAdmin = (token) => {
+-    localStorage.setItem('token', token);
++  const enterAdmin = (data) => {
++    localStorage.setItem('token', data.token);
+     localStorage.setItem('role', 'ADMIN');
++    localStorage.setItem('username', data.username || username);
++    if (data.userId != null) localStorage.setItem('userId', String(data.userId));
+     navigate('/dashboard');
+   };
+ 
+@@ -23,10 +25,11 @@ export default function LoginPage() {
+         setError('Kein Admin-Zugang');
+         return;
+       }
+-      enterAdmin(data.token);
++      enterAdmin(data);
+     } catch {
+       localStorage.removeItem('token');
+       localStorage.removeItem('role');
++      localStorage.removeItem('userId');
+       setError('Login fehlgeschlagen. Bitte admin / password verwenden und prüfen, ob der API-Gateway läuft.');
+     }
+   };
+diff --git a/frontend/shiftlead-web/src/pages/OrdersPage.jsx b/frontend/shiftlead-web/src/pages/OrdersPage.jsx
+index f6fdd81..374fdf2 100644
+--- a/frontend/shiftlead-web/src/pages/OrdersPage.jsx
++++ b/frontend/shiftlead-web/src/pages/OrdersPage.jsx
+@@ -1,28 +1,155 @@
++import { useEffect, useMemo, useState } from 'react';
+ import Layout from '../components/Layout';
++import api from '../services/api';
++
++const STATUS_LABELS = {
++  OPEN: 'Offen',
++  IN_PROGRESS: 'Aktiv',
++  DONE: 'Abgeschlossen',
++};
+ 
+ export default function OrdersPage() {
++  const shiftLeadId = localStorage.getItem('userId');
++  const [orders, setOrders] = useState([]);
++  const [search, setSearch] = useState('');
++  const [status, setStatus] = useState('ALL');
++  const [loading, setLoading] = useState(false);
++  const [message, setMessage] = useState('');
++  const [error, setError] = useState('');
++
++  const loadOrders = async () => {
++    if (!shiftLeadId) {
++      setError('Keine Schichtleiter-ID im Login gefunden. Bitte neu einloggen.');
++      return;
++    }
++    setLoading(true);
++    setError('');
++    setMessage('');
++    try {
++      const { data } = await api.get('/api/orders', { params: { shiftLeadId } });
++      setOrders(data || []);
++    } catch (err) {
++      setError(readError(err, 'Aufträge konnten nicht geladen werden.'));
++    } finally {
++      setLoading(false);
++    }
++  };
++
++  useEffect(() => {
++    loadOrders();
++  }, []);
++
++  const filteredOrders = useMemo(() => {
++    return orders
++      .filter(order => status === 'ALL' || order.status === status)
++      .filter(order => {
++        const text = [order.title, order.company, order.location, order.description, order.requiredRole, order.status]
++          .join(' ')
++          .toLowerCase();
++        return text.includes(search.toLowerCase());
++      });
++  }, [orders, search, status]);
++
++  const setOrderStatus = async (orderId, nextStatus) => {
++    setError('');
++    setMessage('');
++    try {
++      const { data } = await api.put(`/api/orders/${orderId}/status`, { status: nextStatus });
++      setOrders(current => current.map(order => order.id === data.id ? data : order));
++      setMessage('Auftragsstatus wurde aktualisiert.');
++    } catch (err) {
++      setError(readError(err, 'Status konnte nicht aktualisiert werden.'));
++    }
++  };
++
+   return (
+     <Layout>
+       <div className="sl-page">
+         <div className="sl-page-header">
+           <h1>Aufträge</h1>
+-          <p>Zugewiesene Aufträge des Schichtleiters · US-SL-007</p>
++          <p>Zugewiesene Aufträge des Schichtleiters · direkt aus dem Order Service</p>
++        </div>
++
++        {error && <p className="form-error">{error}</p>}
++        {message && <p className="form-success">{message}</p>}
++
++        <div className="panel" style={{ marginBottom: 18 }}>
++          <div className="toolbar" style={{ marginBottom: 0 }}>
++            <input
++              value={search}
++              onChange={event => setSearch(event.target.value)}
++              placeholder="Aufträge suchen"
++            />
++            <select value={status} onChange={event => setStatus(event.target.value)}>
++              <option value="ALL">Alle Status</option>
++              <option value="OPEN">Offen</option>
++              <option value="IN_PROGRESS">Aktiv</option>
++              <option value="DONE">Abgeschlossen</option>
++            </select>
++            <button className="secondary-button" type="button" onClick={loadOrders} disabled={loading}>
++              {loading ? 'Lade…' : 'Aktualisieren'}
++            </button>
++          </div>
+         </div>
+ 
+         <div className="panel">
+-          <div className="empty-state">
+-            <p style={{ margin: '0 0 8px', fontWeight: 600 }}>Order Service noch nicht verbunden</p>
+-            <p style={{ margin: 0, fontSize: 14 }}>
+-              Sobald der Order Service implementiert ist, werden hier die zugewiesenen Aufträge
+-              mit Status, Zeitraum und Mitarbeiterzuordnung angezeigt.
+-            </p>
+-            <p style={{ margin: '12px 0 0', fontSize: 13, color: '#607080' }}>
+-              Eine optionale Auftrag-ID kann bereits jetzt beim Hinzufügen einer Schicht in der
+-              Arbeitsplanung hinterlegt werden.
+-            </p>
++          <div className="table-wrap">
++            <table>
++              <thead>
++                <tr>
++                  <th>Auftrag</th>
++                  <th>Firma / Ort</th>
++                  <th>Zeitraum</th>
++                  <th>Rolle</th>
++                  <th>Status</th>
++                  <th>Mitarbeiter</th>
++                </tr>
++              </thead>
++              <tbody>
++                {filteredOrders.length === 0 && (
++                  <tr>
++                    <td colSpan={6} style={{ textAlign: 'center', color: '#64748b', padding: 16 }}>
++                      {loading ? 'Aufträge werden geladen…' : 'Keine zugewiesenen Aufträge gefunden.'}
++                    </td>
++                  </tr>
++                )}
++                {filteredOrders.map(order => (
++                  <tr key={order.id}>
++                    <td>
++                      <strong>{order.title}</strong><br />
++                      <span className="muted">#{order.id} · {order.description || 'Keine Beschreibung'}</span>
++                    </td>
++                    <td>{order.company || '—'}<br /><span className="muted">{order.location || '—'}</span></td>
++                    <td>{formatDate(order.startDate)} bis {formatDate(order.endDate)}</td>
++                    <td>{order.requiredRole || '—'}</td>
++                    <td>
++                      <select
++                        className="compact-select"
++                        value={order.status}
++                        onChange={event => setOrderStatus(order.id, event.target.value)}
++                      >
++                        {Object.entries(STATUS_LABELS).map(([value, label]) => (
++                          <option key={value} value={value}>{label}</option>
++                        ))}
++                      </select>
++                    </td>
++                    <td>{order.employeeIds?.length ? order.employeeIds.map(id => `#${id}`).join(', ') : 'Noch keine'}</td>
++                  </tr>
++                ))}
++              </tbody>
++            </table>
+           </div>
+         </div>
+       </div>
+     </Layout>
+   );
+ }
++
++function formatDate(value) {
++  if (!value) return '—';
++  return new Date(`${value}T00:00:00`).toLocaleDateString('de-CH');
++}
++
++function readError(err, fallback) {
++  return err?.response?.data?.message || err?.response?.data?.error || fallback;
++}
+diff --git a/frontend/shiftlead-web/src/pages/PlanningPage.jsx b/frontend/shiftlead-web/src/pages/PlanningPage.jsx
+index 553840f..7e039b7 100644
+--- a/frontend/shiftlead-web/src/pages/PlanningPage.jsx
++++ b/frontend/shiftlead-web/src/pages/PlanningPage.jsx
+@@ -27,6 +27,7 @@ export default function PlanningPage() {
+   const [workPlans, setWorkPlans] = useState([]);
+   const [selectedId, setSelectedId] = useState(null);
+   const [employees, setEmployees] = useState([]);
++  const [orders, setOrders] = useState([]);
+   const [workPlanForm, setWorkPlanForm] = useState(emptyWorkPlanForm);
+   const [shiftForm, setShiftForm] = useState(emptyShiftForm);
+   const [loading, setLoading] = useState(false);
+@@ -67,9 +68,21 @@ export default function PlanningPage() {
+     }
+   };
+ 
++
++  const loadOrders = async () => {
++    if (!shiftLeadId) return;
++    try {
++      const { data } = await api.get('/api/orders', { params: { shiftLeadId } });
++      setOrders(data.filter(order => order.status !== 'DONE'));
++    } catch {
++      setOrders([]);
++    }
++  };
++
+   useEffect(() => {
+     loadWorkPlans();
+     loadEmployees();
++    loadOrders();
+   }, []);
+ 
+   const createWorkPlan = async (event) => {
+@@ -322,15 +335,28 @@ export default function PlanningPage() {
+                         )}
+                       </label>
+                       <label style={labelStyle}>
+-                        Auftrag-ID optional
+-                        <input
+-                          type="number"
+-                          min="1"
+-                          value={shiftForm.orderId}
+-                          onChange={e => setShiftForm({ ...shiftForm, orderId: e.target.value })}
+-                          style={inputStyle}
+-                          placeholder="z.B. 1"
+-                        />
++                        Auftrag optional
++                        {orders.length > 0 ? (
++                          <select
++                            value={shiftForm.orderId}
++                            onChange={e => setShiftForm({ ...shiftForm, orderId: e.target.value })}
++                            style={inputStyle}
++                          >
++                            <option value="">Kein Auftrag</option>
++                            {orders.map(order => (
++                              <option key={order.id} value={order.id}>#{order.id} {order.title}</option>
++                            ))}
++                          </select>
++                        ) : (
++                          <input
++                            type="number"
++                            min="1"
++                            value={shiftForm.orderId}
++                            onChange={e => setShiftForm({ ...shiftForm, orderId: e.target.value })}
++                            style={inputStyle}
++                            placeholder="z.B. 1"
++                          />
++                        )}
+                       </label>
+                       <label style={labelStyle}>
+                         Datum
+@@ -400,7 +426,7 @@ export default function PlanningPage() {
+                         <td style={td}>{formatDate(shift.shiftDate)}</td>
+                         <td style={td}>{shift.startTime?.slice(0, 5)} – {shift.endTime?.slice(0, 5)}</td>
+                         <td style={td}>{employeeName(shift.employeeId, employees)}</td>
+-                        <td style={td}>{shift.orderId ? `#${shift.orderId}` : '—'}</td>
++                        <td style={td}>{orderTitle(shift.orderId, orders)}</td>
+                         <td style={td}><b>{formatHours(shift.plannedHours)} h</b></td>
+                         <td style={td}>{shift.notes || '—'}</td>
+                       </tr>
+@@ -440,6 +466,12 @@ function readError(err, fallback) {
+   return message || fallback;
+ }
+ 
++function orderTitle(orderId, orders) {
++  if (!orderId) return '—';
++  const order = orders.find(item => Number(item.id) === Number(orderId));
++  return order ? `#${order.id} ${order.title}` : `#${orderId}`;
++}
++
+ function employeeName(employeeId, employees) {
+   const employee = employees.find(item => Number(item.id) === Number(employeeId));
+   return employee ? `#${employee.id} ${employee.firstName} ${employee.lastName}` : `#${employeeId}`;
+diff --git a/mobile/lib/screens/report_screen.dart b/mobile/lib/screens/report_screen.dart
+index 0a105b0..af9a26c 100644
+--- a/mobile/lib/screens/report_screen.dart
++++ b/mobile/lib/screens/report_screen.dart
+@@ -1,6 +1,9 @@
+ import 'dart:io';
+ import 'package:flutter/material.dart';
+ import 'package:image_picker/image_picker.dart';
++import 'package:provider/provider.dart';
++import '../services/api_service.dart';
++import '../services/auth_service.dart';
+ 
+ class ReportScreen extends StatefulWidget {
+   const ReportScreen({super.key});
+@@ -12,40 +15,149 @@ class ReportScreen extends StatefulWidget {
+ class _ReportScreenState extends State<ReportScreen> {
+   File? _image;
+   final ImagePicker _picker = ImagePicker();
++  final TextEditingController _orderIdController = TextEditingController();
++  final TextEditingController _noteController = TextEditingController();
++  bool _uploading = false;
++  String? _message;
++  String? _error;
++
++  @override
++  void dispose() {
++    _orderIdController.dispose();
++    _noteController.dispose();
++    super.dispose();
++  }
+ 
+   Future<void> _pickImage() async {
+-    final picked = await _picker.pickImage(source: ImageSource.camera);
+-    if (picked != null) setState(() => _image = File(picked.path));
++    final picked = await _picker.pickImage(source: ImageSource.camera, imageQuality: 80);
++    if (picked != null) {
++      setState(() {
++        _image = File(picked.path);
++        _message = null;
++        _error = null;
++      });
++    }
++  }
++
++  Future<void> _uploadImage() async {
++    final auth = context.read<AuthService>();
++    final image = _image;
++
++    if (image == null) return;
++    if (auth.userId == null) {
++      setState(() => _error = 'Keine Mitarbeiter-ID im Login gefunden. Bitte neu anmelden.');
++      return;
++    }
++
++    setState(() {
++      _uploading = true;
++      _message = null;
++      _error = null;
++    });
++
++    try {
++      final fields = <String, String>{
++        'employeeId': auth.userId.toString(),
++      };
++      final orderId = _orderIdController.text.trim();
++      final note = _noteController.text.trim();
++      if (orderId.isNotEmpty) fields['orderId'] = orderId;
++      if (note.isNotEmpty) fields['note'] = note;
++
++      final api = ApiService(auth);
++      final result = await api.uploadImage('/api/media/upload', image, fields: fields);
++      setState(() {
++        _message = 'Rapport hochgeladen: ${result['filename'] ?? 'Bild'}';
++        _image = null;
++        _orderIdController.clear();
++        _noteController.clear();
++      });
++    } catch (e) {
++      setState(() => _error = 'Upload fehlgeschlagen: $e');
++    } finally {
++      if (mounted) setState(() => _uploading = false);
++    }
+   }
+ 
+   @override
+   Widget build(BuildContext context) {
+-    return Padding(
++    return SingleChildScrollView(
+       padding: const EdgeInsets.all(16),
+       child: Column(
+         crossAxisAlignment: CrossAxisAlignment.stretch,
+         children: [
+           const Text('Rapport / Bilder', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
++          const SizedBox(height: 8),
++          const Text(
++            'Nimm ein Foto auf und lade es als Rapportnachweis in MongoDB hoch.',
++            style: TextStyle(color: Colors.black54),
++          ),
+           const SizedBox(height: 16),
++          if (_message != null)
++            _InfoBox(text: _message!, color: Colors.green.shade700, background: Colors.green.shade50),
++          if (_error != null)
++            _InfoBox(text: _error!, color: Colors.red.shade700, background: Colors.red.shade50),
+           if (_image != null)
+             ClipRRect(
+               borderRadius: BorderRadius.circular(8),
+               child: Image.file(_image!, height: 220, fit: BoxFit.cover),
+             ),
+           const SizedBox(height: 12),
++          TextField(
++            controller: _orderIdController,
++            keyboardType: TextInputType.number,
++            decoration: const InputDecoration(
++              labelText: 'Auftrag-ID optional',
++              border: OutlineInputBorder(),
++            ),
++          ),
++          const SizedBox(height: 12),
++          TextField(
++            controller: _noteController,
++            minLines: 2,
++            maxLines: 4,
++            decoration: const InputDecoration(
++              labelText: 'Notiz optional',
++              border: OutlineInputBorder(),
++            ),
++          ),
++          const SizedBox(height: 12),
+           ElevatedButton.icon(
+-            onPressed: _pickImage,
++            onPressed: _uploading ? null : _pickImage,
+             icon: const Icon(Icons.camera_alt),
+             label: const Text('Bild aufnehmen'),
+           ),
+           const SizedBox(height: 12),
+           ElevatedButton.icon(
+-            onPressed: _image == null ? null : () {},
+-            icon: const Icon(Icons.upload),
+-            label: const Text('Hochladen'),
++            onPressed: _image == null || _uploading ? null : _uploadImage,
++            icon: _uploading
++                ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
++                : const Icon(Icons.upload),
++            label: Text(_uploading ? 'Lade hoch…' : 'Hochladen'),
+           ),
+         ],
+       ),
+     );
+   }
+ }
++
++class _InfoBox extends StatelessWidget {
++  final String text;
++  final Color color;
++  final Color background;
++
++  const _InfoBox({required this.text, required this.color, required this.background});
++
++  @override
++  Widget build(BuildContext context) {
++    return Container(
++      margin: const EdgeInsets.only(bottom: 12),
++      padding: const EdgeInsets.all(12),
++      decoration: BoxDecoration(
++        color: background,
++        borderRadius: BorderRadius.circular(8),
++      ),
++      child: Text(text, style: TextStyle(color: color)),
++    );
++  }
++}
+diff --git a/mobile/lib/services/api_service.dart b/mobile/lib/services/api_service.dart
+index 6c31eea..6f93368 100644
+--- a/mobile/lib/services/api_service.dart
++++ b/mobile/lib/services/api_service.dart
+@@ -29,9 +29,18 @@ class ApiService {
+     return jsonDecode(res.body);
+   }
+ 
+-  Future<dynamic> uploadImage(String path, File imageFile) async {
++  Future<dynamic> uploadImage(
++    String path,
++    File imageFile, {
++    Map<String, String>? fields,
++  }) async {
+     final request = http.MultipartRequest('POST', Uri.parse('$_baseUrl$path'));
+-    request.headers['Authorization'] = 'Bearer ${_auth.token}';
++    if (_auth.token != null) {
++      request.headers['Authorization'] = 'Bearer ${_auth.token}';
++    }
++    if (fields != null) {
++      request.fields.addAll(fields);
++    }
+     request.files.add(await http.MultipartFile.fromPath('file', imageFile.path));
+     final streamedResponse = await request.send();
+     final res = await http.Response.fromStream(streamedResponse);

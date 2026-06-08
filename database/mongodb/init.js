@@ -12,10 +12,11 @@ db.createCollection('media_reports', {
         rapport_id:    { bsonType: 'string' },
         filename:      { bsonType: 'string' },
         content_type:  { bsonType: 'string' },
-        file_size:     { bsonType: 'int' },
+        file_size:     { bsonType: ['int', 'long'] },
         storage_path:  { bsonType: 'string' },
         uploaded_at:   { bsonType: 'date' },
-        metadata:      { bsonType: 'object' }
+        metadata:      { bsonType: 'object' },
+        data:          { bsonType: 'binData' }
       }
     }
   }

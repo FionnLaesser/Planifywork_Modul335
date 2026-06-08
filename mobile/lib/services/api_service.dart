@@ -29,9 +29,18 @@ class ApiService {
     return jsonDecode(res.body);
   }
 
-  Future<dynamic> uploadImage(String path, File imageFile) async {
+  Future<dynamic> uploadImage(
+    String path,
+    File imageFile, {
+    Map<String, String>? fields,
+  }) async {
     final request = http.MultipartRequest('POST', Uri.parse('$_baseUrl$path'));
-    request.headers['Authorization'] = 'Bearer ${_auth.token}';
+    if (_auth.token != null) {
+      request.headers['Authorization'] = 'Bearer ${_auth.token}';
+    }
+    if (fields != null) {
+      request.fields.addAll(fields);
+    }
     request.files.add(await http.MultipartFile.fromPath('file', imageFile.path));
     final streamedResponse = await request.send();
     final res = await http.Response.fromStream(streamedResponse);
