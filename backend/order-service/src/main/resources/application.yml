@@ -4,7 +4,7 @@ spring:
   application:
     name: order-service
   datasource:
-    url: jdbc:mysql://localhost:3306/workforce
+    url: jdbc:mysql://mysql-db:3306/workforce
     username: workforce
     password: workforce
     driver-class-name: com.mysql.cj.jdbc.Driver
