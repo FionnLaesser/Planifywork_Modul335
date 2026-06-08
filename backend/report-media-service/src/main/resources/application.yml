@@ -6,5 +6,9 @@ spring:
   data:
     mongodb:
       uri: mongodb://workforce:workforce@localhost:27017/workforce-media?authSource=admin
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 12MB
 jwt:
   secret: workforce-super-secret-jwt-key-change-in-production-min-256-bits

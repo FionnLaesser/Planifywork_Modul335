@@ -96,7 +96,7 @@ Alle Frontends verwenden denselben Login-Endpunkt über den API-Gateway (`localh
 | Seite | Funktion |
 |---|---|
 | Rollen | Benutzer aus der DB anzeigen, Rolle ändern, deaktivieren/aktivieren |
-| Aufträge | Aufträge verwalten (lokal) |
+| Aufträge | Aufträge über den Order Service erstellen, bearbeiten, zuweisen und Status ändern |
 | HR / Mitarbeiter | Übersicht (lokal) |
 
 **HR** → http://localhost:3002
@@ -113,6 +113,7 @@ Alle Frontends verwenden denselben Login-Endpunkt über den API-Gateway (`localh
 | Seite | URL | Funktion |
 |---|---|---|
 | Arbeitsplanung | `/planning` | Arbeitspläne erstellen, Schichten hinzufügen, veröffentlichen |
+| Aufträge | `/orders` | Zugewiesene Aufträge aus dem Order Service einsehen und Status ändern |
 
 ---
 
@@ -446,14 +447,38 @@ Jede React-App hat dieselbe interne Struktur:
 
 **Aufgabe:** Auftragsmanagement. Admin erstellt Aufträge, Schichtleiter empfangen sie, Mitarbeiter können Auftragsdaten herunterladen.
 
-**Noch zu implementieren:**
-- `GET /api/orders` – Aufträge auflisten (gefiltert nach Rolle)
+**Implementiert:**
+- `GET /api/orders` – Aufträge auflisten, optional mit `?shiftLeadId=` und `?status=` filtern
+- `GET /api/orders/{id}` – Auftragsdetail anzeigen
 - `POST /api/orders` – Auftrag erstellen (Admin)
-- `PUT /api/orders/{id}` – Auftrag bearbeiten
-- `PUT /api/orders/{id}/assign` – Schichtleiter/Mitarbeiter zuweisen
-- `GET /api/orders/{id}/download` – Auftragsdaten herunterladen
-- Entities: `Order`, `OrderEmployee`
+- `PUT /api/orders/{id}` – Auftrag bearbeiten (Admin)
+- `PUT /api/orders/{id}/assign` – Schichtleiter/Mitarbeiter zuweisen (Admin)
+- `PUT /api/orders/{id}/status` – Status ändern (Admin/Schichtleiter)
+- `GET /api/orders/{id}/download` – Auftragsdaten als JSON abrufen
+- Entities: `WorkOrder`, `OrderEmployee`
 - Status-Enum: `OPEN`, `IN_PROGRESS`, `DONE`
+
+**Beispiel: Auftrag erstellen**
+
+```http
+POST http://localhost:8000/api/orders
+Authorization: Bearer <admin-token>
+Content-Type: application/json
+
+{
+  "title": "Umbau Eingang A",
+  "description": "Material prüfen und Rapportbilder hochladen",
+  "company": "Demo AG",
+  "location": "Zürich",
+  "startDate": "2026-06-01",
+  "endDate": "2026-06-30",
+  "requiredRole": "Montage",
+  "assignedShiftLeadId": 3,
+  "createdBy": 1,
+  "status": "OPEN",
+  "employeeIds": [4]
+}
+```
 
 ---
 
@@ -563,12 +588,26 @@ Content-Type: application/json
 
 **Aufgabe:** Bild-Uploads aus der Mobile App empfangen und in MongoDB speichern.
 
-**Noch zu implementieren:**
-- `POST /api/media/upload` – Bild hochladen (Multipart)
-- `GET /api/media/{id}` – Bild abrufen
-- `GET /api/media/order/{orderId}` – alle Bilder eines Auftrags
-- MongoDB-Document: `MediaReport` (employeeId, orderId, filename, contentType, storagePath, uploadedAt, metadata)
-- Dateispeicherung: Lokal im Container oder S3-kompatibel (z.B. MinIO)
+**Implementiert:**
+- `POST /api/media/upload` – Bild aus der Mobile App per Multipart hochladen
+- `GET /api/media/{id}` – Bilddatei aus MongoDB abrufen
+- `GET /api/media/order/{orderId}` – alle Rapportbilder eines Auftrags auflisten
+- `GET /api/media/employee/{employeeId}` – alle Rapportbilder eines Mitarbeiters auflisten
+- MongoDB-Document: `MediaReport` (employeeId, orderId, rapportId, filename, contentType, fileSize, storagePath, uploadedAt, metadata, data)
+- Bilddaten werden direkt in MongoDB gespeichert; maximale Upload-Grösse: 10 MB
+
+**Beispiel: Rapportbild hochladen**
+
+```http
+POST http://localhost:8000/api/media/upload
+Authorization: Bearer <employee-token>
+Content-Type: multipart/form-data
+
+file=<bild.jpg>
+employeeId=4
+orderId=1
+note=Rapportfoto Eingang A
+```
 
 ---
 
@@ -592,15 +631,15 @@ Content-Type: application/json
 - Rollen-Tab: alle Benutzer aus der DB anzeigen, Rolle ändern, deaktivieren/aktivieren (`GET /api/users`, `PUT /api/users/:id`)
 - HR-Tab: HR-Benutzer aus DB anzeigen, anlegen, bearbeiten und deaktivieren/aktivieren (`GET /api/users?role=HR`, `POST /api/users`, `PUT /api/users/:id`)
 - Mitarbeiter-Tab: Mitarbeiter aus DB anzeigen, anlegen, bearbeiten und deaktivieren/aktivieren (`GET /api/users?role=EMPLOYEE`, `POST /api/users`, `PUT /api/users/:id`)
-- Aufträge, Firmenkonzepte, Stunden-/Lohnregeln, Berichte, Audit-Log: lokal im Browser (kein Backend für diese Bereiche noch vorhanden)
-- Suche und Übersichts-Statistiken verwenden echte DB-Daten für Benutzer/Mitarbeiter
+- Aufträge: werden über den Order Service gespeichert (`GET/POST/PUT /api/orders`)
+- Firmenkonzepte, Stunden-/Lohnregeln, Berichte, Audit-Log: weiterhin lokal im Browser
+- Suche und Übersichts-Statistiken verwenden echte DB-Daten für Benutzer/Mitarbeiter/Aufträge
 
-> **Hinweis:** Aufträge, Firmenkonzepte, Stunden- und Lohnregeln werden aktuell im `localStorage` des Browsers gespeichert, da die entsprechenden Backend-Services (Order Service, etc.) noch nicht vollständig implementiert sind. Diese Daten sind gerätespezifisch und werden bei `localStorage`-Reset zurückgesetzt.
+> **Hinweis:** Firmenkonzepte, Stunden- und Lohnregeln werden aktuell noch im `localStorage` des Browsers gespeichert. Aufträge sind jetzt backendgestützt und bleiben in MySQL erhalten.
 
 > **Hinweis Bearbeiten-Formular:** Beim Bearbeiten eines bestehenden HR- oder Mitarbeiter-Benutzers werden Benutzername und Passwort ausgeblendet, da der `PUT /api/users/:id` Endpunkt diese Felder nicht akzeptiert (Benutzername ist eindeutig und unveränderlich; Passwortänderung ist nicht implementiert).
 
 **Noch zu implementieren:**
-- Aufträge über den Order Service speichern (`POST /api/orders`)
 - Firmendaten-Seite (`/company`)
 - Stundenübersicht aus dem Time Service laden
 
@@ -626,8 +665,12 @@ Content-Type: application/json
 - Stundenübersicht mit HR-Kontingent, geplanten Stunden, Reststunden und Warnungen
 - Arbeitsplan veröffentlichen, damit Mitarbeiter die Schichten im Mobile-Kalender sehen
 
+**Implementiert zusätzlich:**
+- Auftrags-Ansicht (`/orders`) lädt zugewiesene Aufträge aus dem Order Service
+- Schichtleiter kann den Auftragsstatus auf `OPEN`, `IN_PROGRESS` oder `DONE` setzen
+- Arbeitsplanung bietet zugewiesene Aufträge als Auswahl für neue Schichten an
+
 **Vorbereitet:**
-- Auftrags-Ansicht (`/orders`) als Platzhalter, bis der Order Service echte Auftragsdaten liefert
 - Notizen-Übersicht (`/notes`) als Platzhalter; Schichtnotizen werden bereits im Arbeitsplan gespeichert
 
 ---
@@ -654,7 +697,6 @@ Content-Type: application/json
 
 - Check-in/out mit API-Aufruf verbinden
 - Ferienanfrage-Formular mit Datumswahl
-- Bild-Upload tatsächlich mit Report Service verbinden
 - Auftrags-Daten herunterladen (Order Service)
 - Info-/Rechteanzeige des eigenen Benutzers
 
@@ -679,7 +721,7 @@ Tabellen (automatisch angelegt via `database/mysql/init.sql`):
 |---|---|
 | `roles` | ADMIN, HR, SHIFT_LEAD, EMPLOYEE |
 | `users` | Alle Benutzer mit Rollenzuweisung |
-| `orders` | Aufträge |
+| `orders` | Aufträge inklusive Firma, Einsatzort, Zeitraum, Status und Schichtleiter-Zuweisung |
 | `order_employees` | Zuordnung Mitarbeiter ↔ Auftrag |
 | `work_plans` | Arbeitspläne inkl. HR-Stundenkontingent, Status und Veröffentlichungszeitpunkt |
 | `shifts` | Einzelschichten mit Mitarbeiter- und optionalem Auftragsbezug |
@@ -707,9 +749,10 @@ Collection: `media_reports`
   "filename": "bild_2024_01.jpg",
   "content_type": "image/jpeg",
   "file_size": 204800,
-  "storage_path": "/uploads/...",
+  "storage_path": "mongodb://workforce-media/media_reports/uuid-...",
   "uploaded_at": "2024-01-15T14:30:00Z",
-  "metadata": {}
+  "metadata": { "note": "Rapportfoto Eingang A" },
+  "data": "<binary image data>"
 }
 ```
 
