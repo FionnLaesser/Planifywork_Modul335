@@ -58,6 +58,23 @@ public class AbsenceService {
     }
 
     /**
+     * Gibt alle Abwesenheiten eines Mitarbeiters zurück.
+     * Wird von der Flutter Mobile App für die eigene Übersicht verwendet.
+     *
+     * @param employeeId Mitarbeiter-ID
+     * @return Liste der Anfragen dieses Mitarbeiters
+     */
+    @Transactional(readOnly = true)
+    public List<AbsenceResponse> getByEmployeeId(Long employeeId) {
+        if (employeeId == null || employeeId <= 0) {
+            throw new IllegalArgumentException("employeeId ist erforderlich");
+        }
+        return absenceRepository.findByEmployeeId(employeeId).stream()
+                .map(AbsenceResponse::from)
+                .toList();
+    }
+
+    /**
      * Gibt alle Abwesenheiten mit dem Status PENDING zurück.
      * Implementiert US-HR-08 (offene Ferienanfragen).
      *
@@ -94,14 +111,23 @@ public class AbsenceService {
      */
     @Transactional
     public AbsenceResponse create(CreateAbsenceRequest request) {
+        if (request.employeeId() == null || request.employeeId() <= 0) {
+            throw new IllegalArgumentException("employeeId ist erforderlich");
+        }
+        if (request.startDate() == null || request.endDate() == null) {
+            throw new IllegalArgumentException("Start- und Enddatum sind erforderlich");
+        }
         if (request.endDate().isBefore(request.startDate())) {
             throw new IllegalArgumentException(
                     "Enddatum darf nicht vor dem Startdatum liegen");
         }
+        if (request.type() == null || request.type().isBlank()) {
+            throw new IllegalArgumentException("Typ ist erforderlich");
+        }
 
         Absence absence = new Absence();
         absence.setEmployeeId(request.employeeId());
-        absence.setType(AbsenceType.valueOf(request.type()));
+        absence.setType(AbsenceType.valueOf(request.type().toUpperCase()));
         absence.setStartDate(request.startDate());
         absence.setEndDate(request.endDate());
         absence.setReason(request.reason());

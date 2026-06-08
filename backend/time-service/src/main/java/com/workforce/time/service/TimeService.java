@@ -52,6 +52,21 @@ public class TimeService {
     }
 
     /**
+     * Gibt die Gesamtstunden eines einzelnen Mitarbeiters in einem Datumsbereich zurück.
+     *
+     * @param employeeId ID des Mitarbeiters
+     * @param from Startdatum (inklusive)
+     * @param to   Enddatum (inklusive)
+     * @return Summe der Arbeitsstunden für diesen Mitarbeiter
+     */
+    @Transactional(readOnly = true)
+    public TotalHoursResponse getTotalHoursForEmployee(Long employeeId, LocalDate from, LocalDate to) {
+        BigDecimal sum = timeEntryRepository.sumHoursForEmployeeAndDateRange(employeeId, from, to);
+        BigDecimal total = sum == null ? BigDecimal.ZERO : sum.setScale(2, RoundingMode.HALF_UP);
+        return new TotalHoursResponse(employeeId, total);
+    }
+
+    /**
      * Gibt alle Zeiteinträge eines Mitarbeiters für einen bestimmten Monat zurück.
      * Implementiert US-HR-05 (Detaillierte Stundenauswertung).
      *
@@ -80,6 +95,13 @@ public class TimeService {
                 .map(TimeEntryResponse::from);
     }
 
+    @Transactional(readOnly = true)
+    public Optional<TimeEntryResponse> getTodayEntry(Long employeeId) {
+        return timeEntryRepository
+                .findFirstByEmployeeIdAndEntryDateOrderByCheckInDesc(employeeId, LocalDate.now())
+                .map(TimeEntryResponse::from);
+    }
+
     /**
      * Erfasst einen Check-in für einen Mitarbeiter.
      * Es darf nur ein offener Check-in pro Tag existieren.
@@ -90,6 +112,10 @@ public class TimeService {
      */
     @Transactional
     public TimeEntryResponse checkIn(CheckInRequest request) {
+        if (request.employeeId() == null || request.employeeId() <= 0) {
+            throw new IllegalArgumentException("employeeId ist erforderlich");
+        }
+
         boolean alreadyCheckedIn = timeEntryRepository
                 .findFirstByEmployeeIdAndCheckOutIsNullOrderByCheckInDesc(request.employeeId())
                 .isPresent();
@@ -118,6 +144,10 @@ public class TimeService {
      */
     @Transactional
     public TimeEntryResponse checkOut(CheckOutRequest request) {
+        if (request.employeeId() == null || request.employeeId() <= 0) {
+            throw new IllegalArgumentException("employeeId ist erforderlich");
+        }
+
         TimeEntry entry = timeEntryRepository
                 .findFirstByEmployeeIdAndCheckOutIsNullOrderByCheckInDesc(request.employeeId())
                 .orElseThrow(() -> new ResourceNotFoundException(
@@ -125,9 +155,12 @@ public class TimeService {
 
         LocalDateTime checkOutTime = LocalDateTime.now();
         int breakMinutes           = request.breakMinutes() != null ? request.breakMinutes() : 0;
+        if (breakMinutes < 0) {
+            throw new IllegalArgumentException("Pausenzeit darf nicht negativ sein");
+        }
 
         long totalMinutes = ChronoUnit.MINUTES.between(entry.getCheckIn(), checkOutTime);
-        long netMinutes   = totalMinutes - breakMinutes;
+        long netMinutes   = Math.max(0, totalMinutes - breakMinutes);
         BigDecimal hours  = BigDecimal.valueOf(netMinutes)
                 .divide(BigDecimal.valueOf(60), 2, RoundingMode.HALF_UP);
 

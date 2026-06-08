@@ -39,7 +39,7 @@ public class TimeController {
      * @return Liste mit Mitarbeiter-ID und Gesamtstunden
      */
     @GetMapping("/total")
-    @PreAuthorize("hasAnyRole('HR', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('HR', 'ADMIN', 'SHIFT_LEAD')")
     public ResponseEntity<List<TotalHoursResponse>> getTotalHours(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
@@ -48,6 +48,28 @@ public class TimeController {
         LocalDate end   = to   != null ? to   : LocalDate.now();
 
         return ResponseEntity.ok(timeService.getTotalHours(start, end));
+    }
+
+    /**
+     * Gibt die Gesamtstunden eines einzelnen Mitarbeiters in einem Datumsbereich zurück.
+     * Wird vom Schichtleiter-Web und optionalen Detailansichten verwendet.
+     *
+     * @param employeeId ID des Mitarbeiters
+     * @param from Startdatum (ISO-Format), Standard: Monatsanfang
+     * @param to   Enddatum (ISO-Format), Standard: heute
+     * @return Mitarbeiter-ID mit Gesamtstunden im gewählten Zeitraum
+     */
+    @GetMapping("/total/{employeeId}")
+    @PreAuthorize("hasAnyRole('HR', 'ADMIN', 'SHIFT_LEAD')")
+    public ResponseEntity<TotalHoursResponse> getTotalHoursForEmployee(
+            @PathVariable Long employeeId,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+
+        LocalDate start = from != null ? from : LocalDate.now().withDayOfMonth(1);
+        LocalDate end   = to   != null ? to   : LocalDate.now();
+
+        return ResponseEntity.ok(timeService.getTotalHoursForEmployee(employeeId, start, end));
     }
 
     /**
@@ -60,7 +82,7 @@ public class TimeController {
      * @return Liste der Tageseinträge
      */
     @GetMapping("/month/{employeeId}")
-    @PreAuthorize("hasAnyRole('HR', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('HR', 'ADMIN', 'SHIFT_LEAD')")
     public ResponseEntity<List<TimeEntryResponse>> getMonthlyEntries(
             @PathVariable Long employeeId,
             @RequestParam(defaultValue = "0") int month,
@@ -76,6 +98,18 @@ public class TimeController {
     @PreAuthorize("hasAnyRole('EMPLOYEE', 'SHIFT_LEAD', 'HR', 'ADMIN')")
     public ResponseEntity<TimeEntryResponse> getCurrentEntry(@PathVariable Long employeeId) {
         Optional<TimeEntryResponse> entry = timeService.getCurrentEntry(employeeId);
+        return entry.map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.noContent().build());
+    }
+
+    /**
+     * Alias für den heutigen Zeiteintrag eines Mitarbeiters.
+     * Dokumentiert als {@code GET /api/time/today/{employeeId}} und kompatibel zu Mobile/Frontend.
+     */
+    @GetMapping("/today/{employeeId}")
+    @PreAuthorize("hasAnyRole('EMPLOYEE', 'SHIFT_LEAD', 'HR', 'ADMIN')")
+    public ResponseEntity<TimeEntryResponse> getTodayEntry(@PathVariable Long employeeId) {
+        Optional<TimeEntryResponse> entry = timeService.getTodayEntry(employeeId);
         return entry.map(ResponseEntity::ok)
                 .orElseGet(() -> ResponseEntity.noContent().build());
     }

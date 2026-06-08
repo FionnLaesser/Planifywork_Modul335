@@ -49,6 +49,19 @@ public class AbsenceController {
     }
 
     /**
+     * Gibt alle Abwesenheiten eines Mitarbeiters zurück.
+     * Wird von der Flutter Mobile App genutzt, damit Mitarbeiter ihre eigenen Anfragen sehen können.
+     *
+     * @param employeeId ID des Mitarbeiters
+     * @return Liste der Abwesenheiten dieses Mitarbeiters
+     */
+    @GetMapping("/employee/{employeeId}")
+    @PreAuthorize("hasAnyRole('EMPLOYEE', 'HR', 'ADMIN', 'SHIFT_LEAD')")
+    public ResponseEntity<List<AbsenceResponse>> getByEmployee(@PathVariable Long employeeId) {
+        return ResponseEntity.ok(absenceService.getByEmployeeId(employeeId));
+    }
+
+    /**
      * Gibt alle offenen (PENDING) Abwesenheitsanfragen zurück.
      * US-HR-08: Offene Ferienanfragen für HR.
      *
