@@ -6,6 +6,7 @@ target/
 # Node / React
 node_modules/
 dist/
+.pio/
 .env
 .env.local
 

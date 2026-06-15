@@ -7,10 +7,11 @@
 // This does not use real secrets and does not verify a real Flipper Zero.
 // The real version should call /api/flipper-auth/verify-device with HMAC and nonce protection.
 
-const char* WIFI_SSID = "Noo Hotspoooot";
-const char* WIFI_PASSWORD = "12345678";
-const char* BACKEND_BASE_URL = "http://10.141.155.145:8000";
-const char* USERNAME = "emp.meier";
+const char *WIFI_SSID = "Noo Hotspoooot";
+const char *WIFI_PASSWORD = "12345678";
+const char *BACKEND_BASE_URL = "http://10.184.176.145:8000";
+const char *USERNAME = "emp.meier";
+const char *FIRMWARE_VERSION = "planifywork-esp32-2026-06-15-2";
 
 // Keep this false for the real phone -> Flipper -> Devboard test.
 // If true, the Devboard can trigger auth without receiving anything from the Flipper.
@@ -21,86 +22,110 @@ const unsigned long FLIPPER_UART_BAUD_RATE = 115200;
 // RX receives SESSION_ID:<id> from the Flipper TXD0 pin.
 const int FLIPPER_UART_RX_PIN = 44;
 const int FLIPPER_UART_TX_PIN = 43;
-const char* SESSION_ID_PREFIX = "SESSION_ID:";
+const char *SESSION_ID_PREFIX = "SESSION_ID:";
 
 unsigned long lastPollAt = 0;
-String flipperUartLine;
+size_t sessionPrefixIndex = 0;
+bool readingSessionId = false;
+String sessionIdBuffer;
 
-void setup() {
+void setup()
+{
   Serial.begin(115200);
   delay(500);
+  Serial.print("Firmware: ");
+  Serial.println(FIRMWARE_VERSION);
+  Serial.print("Backend: ");
+  Serial.println(BACKEND_BASE_URL);
 
   Serial1.begin(
-    FLIPPER_UART_BAUD_RATE,
-    SERIAL_8N1,
-    FLIPPER_UART_RX_PIN,
-    FLIPPER_UART_TX_PIN
-  );
+      FLIPPER_UART_BAUD_RATE,
+      SERIAL_8N1,
+      FLIPPER_UART_RX_PIN,
+      FLIPPER_UART_TX_PIN);
   Serial.println("Flipper UART ready, waiting for SESSION_ID:<id>");
 
   connectWiFi();
 }
 
-void loop() {
-  if (WiFi.status() != WL_CONNECTED) {
+void loop()
+{
+  if (WiFi.status() != WL_CONNECTED)
+  {
     connectWiFi();
   }
 
   processFlipperUart();
 
-  if (!ENABLE_LATEST_PENDING_FALLBACK) {
+  if (!ENABLE_LATEST_PENDING_FALLBACK)
+  {
     return;
   }
 
   unsigned long now = millis();
-  if (now - lastPollAt >= POLL_INTERVAL_MS || lastPollAt == 0) {
+  if (now - lastPollAt >= POLL_INTERVAL_MS || lastPollAt == 0)
+  {
     lastPollAt = now;
     runAuthTest();
   }
 }
 
-void processFlipperUart() {
-  while (Serial1.available() > 0) {
+void processFlipperUart()
+{
+  while (Serial1.available() > 0)
+  {
     char value = static_cast<char>(Serial1.read());
 
-    if (value == '\r') {
+    if (readingSessionId)
+    {
+      if (isJsonDigit(value))
+      {
+        if (sessionIdBuffer.length() < 20)
+        {
+          sessionIdBuffer += value;
+        }
+        else
+        {
+          Serial.println("Session ID too long, resetting UART parser");
+          readingSessionId = false;
+          sessionIdBuffer = "";
+        }
+        continue;
+      }
+
+      if (sessionIdBuffer.length() > 0)
+      {
+        handleFlipperSessionId(sessionIdBuffer);
+      }
+
+      readingSessionId = false;
+      sessionIdBuffer = "";
       continue;
     }
 
-    if (value == '\n') {
-      handleFlipperUartLine(flipperUartLine);
-      flipperUartLine = "";
-      continue;
+    if (value == SESSION_ID_PREFIX[sessionPrefixIndex])
+    {
+      sessionPrefixIndex++;
+      if (SESSION_ID_PREFIX[sessionPrefixIndex] == '\0')
+      {
+        sessionPrefixIndex = 0;
+        readingSessionId = true;
+        sessionIdBuffer = "";
+      }
     }
-
-    if (flipperUartLine.length() >= 79) {
-      Serial.println("UART line too long, clearing buffer");
-      flipperUartLine = "";
-      continue;
+    else
+    {
+      sessionPrefixIndex = value == SESSION_ID_PREFIX[0] ? 1 : 0;
     }
-
-    flipperUartLine += value;
   }
 }
 
-void handleFlipperUartLine(String line) {
-  line.trim();
-  if (line.length() == 0) {
-    return;
-  }
-
-  Serial.print("Received UART line: ");
-  Serial.println(line);
-
-  if (!line.startsWith(SESSION_ID_PREFIX)) {
-    Serial.println("Ignoring UART line without SESSION_ID prefix");
-    return;
-  }
-
-  String sessionIdText = line.substring(strlen(SESSION_ID_PREFIX));
+void handleFlipperSessionId(String sessionIdText)
+{
   sessionIdText.trim();
 
-  if (!isPositiveNumber(sessionIdText)) {
+  if (!isPositiveNumber(sessionIdText))
+  {
     Serial.print("Invalid sessionId from UART: ");
     Serial.println(sessionIdText);
     return;
@@ -121,7 +146,8 @@ void handleFlipperUartLine(String line) {
   lastPollAt = millis();
 }
 
-void connectWiFi() {
+void connectWiFi()
+{
   Serial.println();
   Serial.print("Connecting to WiFi: ");
   Serial.println(WIFI_SSID);
@@ -129,7 +155,8 @@ void connectWiFi() {
   WiFi.mode(WIFI_STA);
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
 
-  while (WiFi.status() != WL_CONNECTED) {
+  while (WiFi.status() != WL_CONNECTED)
+  {
     delay(500);
     Serial.print(".");
   }
@@ -139,7 +166,8 @@ void connectWiFi() {
   Serial.println(WiFi.localIP());
 }
 
-void runAuthTest() {
+void runAuthTest()
+{
   String pendingResponse;
   int getStatus = getLatestPending(pendingResponse);
 
@@ -148,12 +176,14 @@ void runAuthTest() {
   Serial.print("latest-pending response: ");
   Serial.println(pendingResponse);
 
-  if (getStatus != 200) {
+  if (getStatus != 200)
+  {
     return;
   }
 
   long sessionId = extractSessionId(pendingResponse);
-  if (sessionId <= 0) {
+  if (sessionId <= 0)
+  {
     Serial.println("Could not extract sessionId from response");
     return;
   }
@@ -170,7 +200,8 @@ void runAuthTest() {
   Serial.println(simulateResponse);
 }
 
-int getLatestPending(String& responseBody) {
+int getLatestPending(String &responseBody)
+{
   HTTPClient http;
   String url = String(BACKEND_BASE_URL) + "/api/flipper-auth/latest-pending?username=" + USERNAME;
 
@@ -185,7 +216,8 @@ int getLatestPending(String& responseBody) {
   return statusCode;
 }
 
-int simulateDevice(long sessionId, String& responseBody) {
+int simulateDevice(long sessionId, String &responseBody)
+{
   HTTPClient http;
   String url = String(BACKEND_BASE_URL) + "/api/flipper-auth/simulate-device";
   String body = "{\"sessionId\":" + String(sessionId) + "}";
@@ -204,49 +236,61 @@ int simulateDevice(long sessionId, String& responseBody) {
   return statusCode;
 }
 
-long extractSessionId(const String& json) {
+long extractSessionId(const String &json)
+{
   int keyIndex = json.indexOf("\"sessionId\"");
-  if (keyIndex < 0) {
+  if (keyIndex < 0)
+  {
     return -1;
   }
 
   int colonIndex = json.indexOf(':', keyIndex);
-  if (colonIndex < 0) {
+  if (colonIndex < 0)
+  {
     return -1;
   }
 
   int valueStart = colonIndex + 1;
-  while (valueStart < json.length() && isJsonWhitespace(json.charAt(valueStart))) {
+  while (valueStart < json.length() && isJsonWhitespace(json.charAt(valueStart)))
+  {
     valueStart++;
   }
 
   int valueEnd = valueStart;
-  while (valueEnd < json.length() && isJsonDigit(json.charAt(valueEnd))) {
+  while (valueEnd < json.length() && isJsonDigit(json.charAt(valueEnd)))
+  {
     valueEnd++;
   }
 
-  if (valueEnd <= valueStart) {
+  if (valueEnd <= valueStart)
+  {
     return -1;
   }
 
   return json.substring(valueStart, valueEnd).toInt();
 }
 
-bool isJsonWhitespace(char value) {
+bool isJsonWhitespace(char value)
+{
   return value == ' ' || value == '\n' || value == '\r' || value == '\t';
 }
 
-bool isJsonDigit(char value) {
+bool isJsonDigit(char value)
+{
   return value >= '0' && value <= '9';
 }
 
-bool isPositiveNumber(const String& value) {
-  if (value.length() == 0) {
+bool isPositiveNumber(const String &value)
+{
+  if (value.length() == 0)
+  {
     return false;
   }
 
-  for (int index = 0; index < value.length(); index++) {
-    if (!isJsonDigit(value.charAt(index))) {
+  for (int index = 0; index < value.length(); index++)
+  {
+    if (!isJsonDigit(value.charAt(index)))
+    {
       return false;
     }
   }
