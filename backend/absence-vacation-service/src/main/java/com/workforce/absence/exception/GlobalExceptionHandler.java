@@ -1,6 +1,7 @@
 package com.workforce.absence.exception;
 
 import org.springframework.http.*;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.bind.annotation.*;
 import java.time.LocalDateTime;
 import java.util.Map;
@@ -23,6 +24,14 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of(
                 "timestamp", LocalDateTime.now().toString(), "status", 400,
                 "error", "Bad Request", "message", ex.getMessage()));
+    }
+
+    /** HTTP 403 für fehlende Rollenberechtigungen (von @PreAuthorize geworfen). */
+    @ExceptionHandler(AccessDeniedException.class)
+    public ResponseEntity<Map<String, Object>> handleAccessDenied(AccessDeniedException ex) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of(
+                "timestamp", LocalDateTime.now().toString(), "status", 403,
+                "error", "Forbidden", "message", "Zugriff verweigert"));
     }
 
     /** HTTP 500 für alle anderen Fehler. */

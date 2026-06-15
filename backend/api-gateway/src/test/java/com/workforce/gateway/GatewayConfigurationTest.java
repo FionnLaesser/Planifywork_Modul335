@@ -63,7 +63,8 @@ class GatewayConfigurationTest {
 
     @Test
     void corsAllowsAllFrontendOrigins() {
-        List<?> origins = (List<?>) gatewayValue(
+        @SuppressWarnings("unchecked")
+        List<String> origins = (List<String>) gatewayValue(
                 "spring", "cloud", "gateway", "globalcors",
                 "corsConfigurations", "[/**]", "allowedOrigins");
         assertThat(origins)
@@ -155,7 +156,8 @@ class GatewayConfigurationTest {
                 .as("Backend-URI der Route " + routeId)
                 .isEqualTo(expectedUri);
 
-        List<?> predicates = (List<?>) route.get("predicates");
+        @SuppressWarnings("unchecked")
+        List<String> predicates = (List<String>) route.get("predicates");
         assertThat(predicates)
                 .as("Path-Predicate der Route " + routeId)
                 .contains(expectedPredicate);
