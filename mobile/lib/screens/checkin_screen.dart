@@ -1,8 +1,14 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../models/flipper_auth_models.dart';
+import '../services/api_config.dart';
 import '../services/api_service.dart';
 import '../services/auth_service.dart';
+import '../services/flipper_auth_api.dart';
+import '../services/hce_session_bridge.dart';
 
 class CheckInScreen extends StatefulWidget {
   const CheckInScreen({super.key, this.active = true});
@@ -14,14 +20,21 @@ class CheckInScreen extends StatefulWidget {
 }
 
 class _CheckInScreenState extends State<CheckInScreen> {
+  static const Duration _pollInterval = Duration(seconds: 1);
+  static const Duration _fallbackWaitTimeout = Duration(seconds: 65);
+
   bool _loading = true;
   bool _busy = false;
   bool _checkedIn = false;
   String? _error;
   String? _message;
+  AuthStartResponse? _pendingSession;
   _TimeEntry? _currentEntry;
   _TimeEntry? _lastEntry;
-  final TextEditingController _breakMinutesController = TextEditingController(text: '0');
+  final TextEditingController _breakMinutesController =
+      TextEditingController(text: '0');
+
+  AuthApi get _flipperApi => AuthApi(ApiConfig.baseUrl);
 
   @override
   void initState() {
@@ -33,6 +46,7 @@ class _CheckInScreenState extends State<CheckInScreen> {
 
   @override
   void dispose() {
+    unawaited(HceSessionBridge.clearSession().catchError((_) {}));
     _breakMinutesController.dispose();
     super.dispose();
   }
@@ -68,14 +82,16 @@ class _CheckInScreenState extends State<CheckInScreen> {
     }
 
     try {
-      final data = await ApiService(auth).get('/api/time/current/$userId');
-      final entry = data == null ? null : _TimeEntry.fromJson(data);
+      final api = ApiService(auth);
+      final entry = await _fetchCurrentEntry(api, userId);
+      final latestEntry = entry ?? await _fetchLatestEntry(api, userId);
       if (!mounted) {
         return;
       }
       setState(() {
         _checkedIn = entry != null;
         _currentEntry = entry;
+        _lastEntry = latestEntry;
         _error = null;
         if (!silent) {
           _message = null;
@@ -106,47 +122,7 @@ class _CheckInScreenState extends State<CheckInScreen> {
   }
 
   Future<void> _checkIn() async {
-    final auth = context.read<AuthService>();
-    final userId = auth.userId;
-    if (userId == null) {
-      setState(() => _error = 'Benutzer-ID fehlt');
-      return;
-    }
-
-    setState(() {
-      _busy = true;
-      _error = null;
-      _message = null;
-    });
-
-    try {
-      final data = await ApiService(auth).post('/api/time/checkin', {
-        'employeeId': userId,
-      });
-      final entry = _TimeEntry.fromJson(data);
-      if (!mounted) {
-        return;
-      }
-      setState(() {
-        _checkedIn = true;
-        _currentEntry = entry;
-        _lastEntry = entry;
-        _message = 'Eingecheckt';
-      });
-    } catch (error) {
-      if (!mounted) {
-        return;
-      }
-      setState(() {
-        _error = error.toString();
-      });
-    } finally {
-      if (mounted) {
-        setState(() {
-          _busy = false;
-        });
-      }
-    }
+    await _runFlipperTimeAction(action: 'LOGIN');
   }
 
   Future<void> _checkOut() async {
@@ -164,41 +140,138 @@ class _CheckInScreenState extends State<CheckInScreen> {
       return;
     }
 
+    await _runFlipperTimeAction(
+      action: 'LOGOUT',
+      breakMinutes: breakMinutes,
+    );
+  }
+
+  Future<void> _runFlipperTimeAction({
+    required String action,
+    int breakMinutes = 0,
+  }) async {
+    final auth = context.read<AuthService>();
+    final userId = auth.userId;
+    final username = auth.username;
+    if (userId == null) {
+      setState(() => _error = 'Benutzer-ID fehlt');
+      return;
+    }
+    if (username == null || username.isEmpty) {
+      setState(() => _error = 'Benutzername fehlt');
+      return;
+    }
+
     setState(() {
       _busy = true;
       _error = null;
-      _message = null;
+      _message = 'Warte auf Flipper';
+      _pendingSession = null;
     });
 
     try {
-      final data = await ApiService(auth).post('/api/time/checkout', {
-        'employeeId': userId,
-        'breakMinutes': breakMinutes,
-      });
-      final entry = _TimeEntry.fromJson(data);
+      final session = await _flipperApi.start(
+        username: username,
+        action: action,
+        breakMinutes: action == 'LOGOUT' ? breakMinutes : null,
+      );
       if (!mounted) {
         return;
       }
+
       setState(() {
-        _checkedIn = false;
-        _currentEntry = null;
-        _lastEntry = entry;
-        _message = 'Ausgecheckt';
+        _pendingSession = session;
+        _message = 'Warte auf Flipper und WiFi-Devboard';
       });
+
+      await HceSessionBridge.updateSession(session: session, username: username);
+      final status = await _waitForDeviceConfirmation(session);
+      await HceSessionBridge.clearSession();
+
+      if (!status.success) {
+        throw ApiException('Backend hat die Zeiterfassung nicht bestätigt');
+      }
+
+      await _refreshAfterConfirmedAction(
+        auth: auth,
+        userId: userId,
+        action: action,
+      );
     } catch (error) {
+      await HceSessionBridge.clearSession().catchError((_) {});
       if (!mounted) {
         return;
       }
       setState(() {
         _error = error.toString();
+        _message = null;
       });
     } finally {
       if (mounted) {
         setState(() {
           _busy = false;
+          _pendingSession = null;
         });
       }
     }
+  }
+
+  Future<AuthStatus> _waitForDeviceConfirmation(
+    AuthStartResponse session,
+  ) async {
+    final deadline =
+        session.expiresAt ?? DateTime.now().add(_fallbackWaitTimeout);
+
+    while (DateTime.now().isBefore(deadline)) {
+      final status = await _flipperApi.status(session.sessionId);
+      if (status.used) {
+        return status;
+      }
+
+      await Future.delayed(_pollInterval);
+    }
+
+    throw ApiException('Keine Bestätigung vom Flipper erhalten');
+  }
+
+  Future<void> _refreshAfterConfirmedAction({
+    required AuthService auth,
+    required int userId,
+    required String action,
+  }) async {
+    final api = ApiService(auth);
+    final current = await _fetchCurrentEntry(api, userId);
+    final latest = current ?? await _fetchLatestEntry(api, userId);
+
+    if (!mounted) {
+      return;
+    }
+
+    if (action == 'LOGIN' && current == null) {
+      throw ApiException('Check-in wurde nicht als offener Eintrag gefunden');
+    }
+    if (action == 'LOGOUT' && (latest == null || latest.checkOut == null)) {
+      throw ApiException(
+        'Check-out wurde nicht als abgeschlossener Eintrag gefunden',
+      );
+    }
+
+    setState(() {
+      _checkedIn = current != null;
+      _currentEntry = current;
+      _lastEntry = latest;
+      _message = action == 'LOGIN' ? 'Eingecheckt' : 'Ausgecheckt';
+    });
+  }
+
+  Future<_TimeEntry?> _fetchCurrentEntry(ApiService api, int userId) async {
+    final data = await api.get('/api/time/current/$userId');
+    return data == null ? null : _TimeEntry.fromJson(data);
+  }
+
+  Future<_TimeEntry?> _fetchLatestEntry(ApiService api, int userId) async {
+    final data = await api.get('/api/time/latest/$userId');
+    return data == null ? null : _TimeEntry.fromJson(data);
   }
 
   @override
@@ -251,7 +324,16 @@ class _CheckInScreenState extends State<CheckInScreen> {
               const SizedBox(height: 12),
               Text(
                 _message!,
+                textAlign: TextAlign.center,
                 style: const TextStyle(color: Color(0xFF166534)),
+              ),
+            ],
+            if (_pendingSession != null) ...[
+              const SizedBox(height: 8),
+              Text(
+                'Session ${_pendingSession!.sessionId}',
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.bodySmall,
               ),
             ],
             if (_error != null) ...[
@@ -339,7 +421,8 @@ class _TimeEntry {
       employeeId: _readInt(map['employeeId']),
       checkIn: _readDateTime(map['checkIn']) ?? DateTime.now(),
       checkOut: _readDateTime(map['checkOut']),
-      breakMinutes: map['breakMinutes'] == null ? 0 : _readInt(map['breakMinutes']),
+      breakMinutes:
+          map['breakMinutes'] == null ? 0 : _readInt(map['breakMinutes']),
       totalHours: _readDouble(map['totalHours']),
     );
   }

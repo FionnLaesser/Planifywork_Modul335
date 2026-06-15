@@ -54,11 +54,11 @@ Wenn du kein offizielles WiFi Devboard verwendest, passe diese Pins an dein Boar
 1. Backend auf dem PC starten.
 2. Die IP vom PC im gleichen WLAN ermitteln, zum Beispiel `192.168.1.50`.
 3. In der Firmware `BACKEND_BASE_URL` auf `http://192.168.1.50:8000` setzen.
-4. In Flutter einen Login für `emp.meier` starten.
+4. In Flutter im Tab `Check-in` Check-in oder Check-out für `emp.meier` starten.
 5. Android an den Flipper halten.
 6. Der Flipper liest die HCE-Payload und sendet `SESSION_ID:<id>` per UART.
 7. Das Devboard ruft `POST /api/flipper-auth/simulate-device` auf.
-8. Der User ist angemeldet.
+8. Die App beendet das Warten, sobald das Backend die Zeiterfassung bestätigt.
 
 ## Fallback Testmodus
 

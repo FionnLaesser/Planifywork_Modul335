@@ -13,6 +13,7 @@ import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.YearMonth;
+import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Optional;
@@ -29,6 +30,8 @@ import java.util.Optional;
 @Service
 @RequiredArgsConstructor
 public class TimeService {
+
+    private static final ZoneId BUSINESS_ZONE = ZoneId.of("Europe/Zurich");
 
     private final TimeEntryRepository timeEntryRepository;
 
@@ -98,7 +101,14 @@ public class TimeService {
     @Transactional(readOnly = true)
     public Optional<TimeEntryResponse> getTodayEntry(Long employeeId) {
         return timeEntryRepository
-                .findFirstByEmployeeIdAndEntryDateOrderByCheckInDesc(employeeId, LocalDate.now())
+                .findFirstByEmployeeIdAndEntryDateOrderByCheckInDesc(employeeId, LocalDate.now(BUSINESS_ZONE))
+                .map(TimeEntryResponse::from);
+    }
+
+    @Transactional(readOnly = true)
+    public Optional<TimeEntryResponse> getLatestEntry(Long employeeId) {
+        return timeEntryRepository
+                .findFirstByEmployeeIdOrderByCheckInDesc(employeeId)
                 .map(TimeEntryResponse::from);
     }
 
@@ -125,7 +135,7 @@ public class TimeService {
                     "Mitarbeiter " + request.employeeId() + " ist bereits eingecheckt");
         }
 
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = LocalDateTime.now(BUSINESS_ZONE);
         TimeEntry entry = new TimeEntry();
         entry.setEmployeeId(request.employeeId());
         entry.setCheckIn(now);
@@ -153,7 +163,7 @@ public class TimeService {
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Kein offener Check-in für Mitarbeiter " + request.employeeId()));
 
-        LocalDateTime checkOutTime = LocalDateTime.now();
+        LocalDateTime checkOutTime = LocalDateTime.now(BUSINESS_ZONE);
         int breakMinutes           = request.breakMinutes() != null ? request.breakMinutes() : 0;
         if (breakMinutes < 0) {
             throw new IllegalArgumentException("Pausenzeit darf nicht negativ sein");

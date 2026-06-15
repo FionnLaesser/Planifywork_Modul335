@@ -184,7 +184,7 @@ class _AbsenceScreenState extends State<AbsenceScreen> {
                   const Text('Neue Anfrage', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
                   const SizedBox(height: 12),
                   DropdownButtonFormField<String>(
-                    value: _type,
+                    initialValue: _type,
                     decoration: const InputDecoration(
                       labelText: 'Typ',
                       border: OutlineInputBorder(),

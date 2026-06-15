@@ -49,6 +49,8 @@ public interface TimeEntryRepository extends JpaRepository<TimeEntry, Long> {
 
     Optional<TimeEntry> findFirstByEmployeeIdAndCheckOutIsNullOrderByCheckInDesc(Long employeeId);
 
+    Optional<TimeEntry> findFirstByEmployeeIdOrderByCheckInDesc(Long employeeId);
+
     Optional<TimeEntry> findFirstByEmployeeIdAndEntryDateOrderByCheckInDesc(
             Long employeeId, LocalDate entryDate);
 

@@ -122,7 +122,7 @@ Alle Frontends verwenden denselben Login-Endpunkt über den API-Gateway (`localh
 
 | Screen | Funktion |
 |---|---|
-| Check-in/out | `POST /api/time/checkin`, `POST /api/time/checkout`; Pausenminuten werden beim Check-out mitgegeben und im Time Service als `breakMinutes` gespeichert |
+| Check-in/out | Startet eine Flipper-Session, wartet auf die WiFi-Devboard-Bestätigung und liest danach `GET /api/time/current/{employeeId}` oder `GET /api/time/latest/{employeeId}` |
 | Absenzen | `POST /api/absences`, `GET /api/absences/employee/{employeeId}` |
 | Rapport | `POST /api/media/upload` mit optionaler Auftrags-ID |
 
@@ -557,6 +557,7 @@ Content-Type: application/json
 - `POST /api/time/checkin` – Check-in speichern
 - `POST /api/time/checkout` – Check-out speichern und Netto-Arbeitszeit berechnen
 - `GET /api/time/current/{employeeId}` – aktuell offener Check-in eines Mitarbeiters
+- `GET /api/time/latest/{employeeId}` – letzter Zeiteintrag eines Mitarbeiters
 - `GET /api/time/today/{employeeId}` – heutiger Zeiteintrag eines Mitarbeiters
 - `GET /api/time/month/{employeeId}?month=&year=` – Monatsauswertung pro Mitarbeiter
 - `GET /api/time/total?from=&to=` – Gesamtstunden aller Mitarbeiter im Zeitraum
@@ -707,7 +708,7 @@ note=Rapportfoto Eingang A
 | `lib/screens/login_screen.dart` | Login-UI |
 | `lib/screens/home_screen.dart` | Bottom-Navigation mit 4 Tabs |
 | `lib/screens/calendar_screen.dart` | Arbeitskalender mit echten veröffentlichten Schichten aus dem Planning Service |
-| `lib/screens/checkin_screen.dart` | Check-in / Check-out Button mit Time-Service-Anbindung |
+| `lib/screens/checkin_screen.dart` | Check-in / Check-out mit Flipper-HCE, WiFi-Devboard-Bestätigung und Time-Service-Abfrage |
 | `lib/screens/absence_screen.dart` | Ferienanfrage + Absenz mit Datumswahl einreichen und eigene Anfragen anzeigen |
 | `lib/screens/report_screen.dart` | Kamera öffnen, Bild aufnehmen und per Report/Media Service hochladen |
 

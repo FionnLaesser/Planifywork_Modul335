@@ -51,6 +51,7 @@ public class AuthService {
                 request.action(),
                 Instant.now().plusSeconds(60)
         );
+        session.setBreakMinutes(request.breakMinutes() == null ? 0 : request.breakMinutes());
         AuthSessionEntity saved = authSessionRepository.save(session);
 
         return new StartAuthResponse(saved.getId(), saved.getChallenge(), saved.getAction(), saved.getExpiresAt());
@@ -68,15 +69,19 @@ public class AuthService {
         }
 
         UserEntity user = session.getUser();
-        user.setLoggedIn(session.getAction() == AuthAction.LOGIN);
-        TimeTrackingService.TimeTrackingResult timeResult = timeTrackingService.apply(user.getId(), session.getAction());
+        TimeTrackingService.TimeTrackingResult timeResult = timeTrackingService.apply(
+                user.getId(),
+                session.getAction(),
+                session.getBreakMinutes()
+        );
+        user.setLoggedIn(timeResult.checkedIn());
         session.setUsed(true);
-        session.setSuccess(true);
+        session.setSuccess(timeResult.success());
 
         userRepository.save(user);
         authSessionRepository.save(session);
 
-        return new MessageResponse(true, timeResult.message());
+        return new MessageResponse(timeResult.success(), timeResult.message());
     }
 
     @Transactional(readOnly = true)

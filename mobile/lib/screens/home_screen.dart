@@ -5,7 +5,6 @@ import '../services/auth_service.dart';
 import 'absence_screen.dart';
 import 'calendar_screen.dart';
 import 'checkin_screen.dart';
-import 'flipper_auth_screen.dart';
 import 'report_screen.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -23,7 +22,6 @@ class _HomeScreenState extends State<HomeScreen> {
     CheckInScreen(),
     AbsenceScreen(),
     ReportScreen(),
-    FlipperAuthScreen(),
   ];
 
   @override
@@ -60,7 +58,6 @@ class _HomeScreenState extends State<HomeScreen> {
             icon: Icon(Icons.camera_alt),
             label: 'Rapport',
           ),
-          BottomNavigationBarItem(icon: Icon(Icons.nfc), label: 'Flipper'),
         ],
       ),
     );

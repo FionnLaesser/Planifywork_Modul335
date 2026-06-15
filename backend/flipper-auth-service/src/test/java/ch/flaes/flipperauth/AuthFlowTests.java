@@ -52,11 +52,14 @@ class AuthFlowTests {
         assertThat(timeEntryRepository.findFirstByEmployeeIdAndCheckOutIsNullOrderByCheckInDesc(fionnId))
                 .isPresent();
 
-        Long logoutSessionId = startSession("LOGOUT");
+        Long logoutSessionId = startSession("LOGOUT", 5);
         simulateDevice(logoutSessionId, "Check-out tracked");
         assertStatus(logoutSessionId, "LOGOUT", false);
         assertThat(timeEntryRepository.findFirstByEmployeeIdAndCheckOutIsNullOrderByCheckInDesc(fionnId))
                 .isEmpty();
+        var entries = timeEntryRepository.findAll();
+        assertThat(entries).hasSize(1);
+        assertThat(entries.get(0).getBreakMinutes()).isEqualTo(5);
     }
 
     @Test
@@ -73,7 +76,7 @@ class AuthFlowTests {
                 .andExpect(jsonPath("$.challenge").isNotEmpty())
                 .andExpect(jsonPath("$.expiresAt").exists());
 
-        simulateDevice(secondSessionId, "No open check-in found");
+        simulateDevice(secondSessionId, "No open check-in found", false);
         simulateDevice(firstSessionId, "Check-in tracked");
 
         mockMvc.perform(get("/api/flipper-auth/latest-pending")
@@ -83,12 +86,20 @@ class AuthFlowTests {
     }
 
     private Long startSession(String action) throws Exception {
+        return startSession(action, null);
+    }
+
+    private Long startSession(String action, Integer breakMinutes) throws Exception {
+        Map<String, Object> body = new java.util.HashMap<>();
+        body.put("username", "fionn");
+        body.put("action", action);
+        if (breakMinutes != null) {
+            body.put("breakMinutes", breakMinutes);
+        }
+
         MvcResult result = mockMvc.perform(post("/api/flipper-auth/start")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(Map.of(
-                                "username", "fionn",
-                                "action", action
-                        ))))
+                        .content(objectMapper.writeValueAsString(body)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.challenge").isNotEmpty())
                 .andExpect(jsonPath("$.action").value(action))
@@ -101,11 +112,15 @@ class AuthFlowTests {
     }
 
     private void simulateDevice(Long sessionId, String expectedMessage) throws Exception {
+        simulateDevice(sessionId, expectedMessage, true);
+    }
+
+    private void simulateDevice(Long sessionId, String expectedMessage, boolean expectedSuccess) throws Exception {
         mockMvc.perform(post("/api/flipper-auth/simulate-device")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(Map.of("sessionId", sessionId))))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.success").value(expectedSuccess))
                 .andExpect(jsonPath("$.message").value(expectedMessage));
     }
 

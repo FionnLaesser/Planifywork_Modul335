@@ -13,10 +13,12 @@ class AuthApi {
   Future<AuthStartResponse> start({
     required String username,
     required String action,
+    int? breakMinutes,
   }) async {
     final json = await _post('/api/flipper-auth/start', {
       'username': username,
       'action': action,
+      if (breakMinutes != null) 'breakMinutes': breakMinutes,
     });
     return AuthStartResponse.fromJson(json);
   }

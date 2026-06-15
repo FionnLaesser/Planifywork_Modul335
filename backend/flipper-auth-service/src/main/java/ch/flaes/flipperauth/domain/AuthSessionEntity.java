@@ -43,6 +43,9 @@ public class AuthSessionEntity {
     @Column(nullable = false)
     private boolean success;
 
+    @Column
+    private Integer breakMinutes = 0;
+
     @Column(nullable = false)
     private Instant createdAt;
 
@@ -113,6 +116,14 @@ public class AuthSessionEntity {
 
     public void setSuccess(boolean success) {
         this.success = success;
+    }
+
+    public Integer getBreakMinutes() {
+        return breakMinutes;
+    }
+
+    public void setBreakMinutes(Integer breakMinutes) {
+        this.breakMinutes = breakMinutes;
     }
 
     public Instant getCreatedAt() {

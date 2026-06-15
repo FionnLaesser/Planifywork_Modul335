@@ -9,6 +9,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Optional;
 
@@ -28,6 +29,8 @@ import java.util.Optional;
 @RequiredArgsConstructor
 public class TimeController {
 
+    private static final ZoneId BUSINESS_ZONE = ZoneId.of("Europe/Zurich");
+
     private final TimeService timeService;
 
     /**
@@ -44,8 +47,9 @@ public class TimeController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
 
-        LocalDate start = from != null ? from : LocalDate.now().withDayOfMonth(1);
-        LocalDate end   = to   != null ? to   : LocalDate.now();
+        LocalDate today = LocalDate.now(BUSINESS_ZONE);
+        LocalDate start = from != null ? from : today.withDayOfMonth(1);
+        LocalDate end   = to   != null ? to   : today;
 
         return ResponseEntity.ok(timeService.getTotalHours(start, end));
     }
@@ -66,8 +70,9 @@ public class TimeController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
 
-        LocalDate start = from != null ? from : LocalDate.now().withDayOfMonth(1);
-        LocalDate end   = to   != null ? to   : LocalDate.now();
+        LocalDate today = LocalDate.now(BUSINESS_ZONE);
+        LocalDate start = from != null ? from : today.withDayOfMonth(1);
+        LocalDate end   = to   != null ? to   : today;
 
         return ResponseEntity.ok(timeService.getTotalHoursForEmployee(employeeId, start, end));
     }
@@ -88,8 +93,9 @@ public class TimeController {
             @RequestParam(defaultValue = "0") int month,
             @RequestParam(defaultValue = "0") int year) {
 
-        int m = month > 0 ? month : LocalDate.now().getMonthValue();
-        int y = year  > 0 ? year  : LocalDate.now().getYear();
+        LocalDate today = LocalDate.now(BUSINESS_ZONE);
+        int m = month > 0 ? month : today.getMonthValue();
+        int y = year  > 0 ? year  : today.getYear();
 
         return ResponseEntity.ok(timeService.getMonthlyEntries(employeeId, m, y));
     }
@@ -110,6 +116,14 @@ public class TimeController {
     @PreAuthorize("hasAnyRole('EMPLOYEE', 'SHIFT_LEAD', 'HR', 'ADMIN')")
     public ResponseEntity<TimeEntryResponse> getTodayEntry(@PathVariable Long employeeId) {
         Optional<TimeEntryResponse> entry = timeService.getTodayEntry(employeeId);
+        return entry.map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.noContent().build());
+    }
+
+    @GetMapping("/latest/{employeeId}")
+    @PreAuthorize("hasAnyRole('EMPLOYEE', 'SHIFT_LEAD', 'HR', 'ADMIN')")
+    public ResponseEntity<TimeEntryResponse> getLatestEntry(@PathVariable Long employeeId) {
+        Optional<TimeEntryResponse> entry = timeService.getLatestEntry(employeeId);
         return entry.map(ResponseEntity::ok)
                 .orElseGet(() -> ResponseEntity.noContent().build());
     }
