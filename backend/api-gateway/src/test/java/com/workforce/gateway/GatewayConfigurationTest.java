@@ -5,6 +5,7 @@ import org.yaml.snakeyaml.Yaml;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -201,11 +202,7 @@ class GatewayConfigurationTest {
     }
 
     private Map<String, Object> loadServiceYaml(String serviceName) {
-        // Maven surefire setzt user.dir auf das Modul-Verzeichnis (backend/api-gateway).
-        // Geschwister-Services liegen unter ../serviceName/src/main/resources/application.yml
-        Path path = Paths.get("..")
-                .resolve(serviceName)
-                .resolve("src/main/resources/application.yml");
+        Path path = backendDir().resolve(serviceName).resolve("src/main/resources/application.yml");
         try (InputStream is = Files.newInputStream(path)) {
             return new Yaml().load(is);
         } catch (IOException e) {
@@ -215,9 +212,7 @@ class GatewayConfigurationTest {
     }
 
     private Properties loadProperties(String serviceName) {
-        Path path = Paths.get("..")
-                .resolve(serviceName)
-                .resolve("src/main/resources/application.properties");
+        Path path = backendDir().resolve(serviceName).resolve("src/main/resources/application.properties");
         Properties props = new Properties();
         try (InputStream is = Files.newInputStream(path)) {
             props.load(is);
@@ -226,6 +221,21 @@ class GatewayConfigurationTest {
                     "Kann Properties für " + serviceName + " nicht laden: " + path.toAbsolutePath(), e);
         }
         return props;
+    }
+
+    // Navigiert vom Classpath-Root (target/classes/) zwei Ebenen hoch zum Modul-Root,
+    // dann eine Ebene hoch zum backend/-Verzeichnis.
+    // Funktioniert unabhängig davon, wo Maven user.dir setzt.
+    private Path backendDir() {
+        try {
+            URL resource = getClass().getResource("/application.yml");
+            assertThat(resource).as("Gateway application.yml nicht im Classpath gefunden").isNotNull();
+            // target/classes/application.yml → getParent() → target/classes/ → getParent() → target/ → getParent() → api-gateway/
+            Path moduleRoot = Paths.get(resource.toURI()).getParent().getParent().getParent();
+            return moduleRoot.getParent(); // = backend/
+        } catch (Exception e) {
+            throw new RuntimeException("Kann backend/-Verzeichnis nicht ermitteln", e);
+        }
     }
 
     @SuppressWarnings("unchecked")
