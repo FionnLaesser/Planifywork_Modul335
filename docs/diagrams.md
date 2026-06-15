@@ -17,6 +17,7 @@ graph TB
         AW["Admin Web\n:3001"]
         HW["HR Web\n:3002"]
         SW["Schichtleiter Web\n:3003"]
+        FW["Flipper Auth Web\n:3004"]
     end
 
     subgraph Gateway["API Gateway"]
@@ -32,6 +33,7 @@ graph TB
         AVS["Absence/Vacation Service\n:8006"]
         BS["Billing Service\n:8007"]
         RMS["Report/Media Service\n:8008"]
+        FAS["Flipper Auth Service\n:8009"]
     end
 
     subgraph DBs["Datenbanken"]
@@ -39,13 +41,13 @@ graph TB
         MONGO[("MongoDB :27017\nworkforce-media DB")]
     end
 
-    BROWSER --> AW & HW & SW
+    BROWSER --> AW & HW & SW & FW
     MOBILE --> GW
-    AW & HW & SW --> GW
+    AW & HW & SW & FW --> GW
 
-    GW --> AS & URS & OS & PS & TS & AVS & BS & RMS
+    GW --> AS & URS & OS & PS & TS & AVS & BS & RMS & FAS
 
-    AS & URS & OS & PS & TS & AVS & BS --> MYSQL
+    AS & URS & OS & PS & TS & AVS & BS & FAS --> MYSQL
     RMS --> MONGO
 ```
 
@@ -164,11 +166,24 @@ classDiagram
         +Long shiftLeadId
         +LocalDate startDate
         +LocalDate endDate
+        +Long hourBudgetId
         +BigDecimal approvedHours
         +WorkPlanStatus status
         +LocalDateTime createdAt
         +LocalDateTime publishedAt
         +List~Shift~ shifts
+    }
+
+    class HourBudget {
+        +Long id
+        +Long shiftLeadId
+        +Integer year
+        +Integer month
+        +BigDecimal approvedHours
+        +Long createdBy
+        +String notes
+        +LocalDateTime createdAt
+        +LocalDateTime updatedAt
     }
 
     class WorkPlanStatus {
@@ -252,6 +267,48 @@ classDiagram
         +BigDecimal subtotal
     }
 
+    class PayrollStatement {
+        +Long id
+        +Long employeeId
+        +Integer year
+        +Integer month
+        +BigDecimal hourlyRate
+        +BigDecimal totalHours
+        +BigDecimal grossAmount
+        +BigDecimal bonusAmount
+        +BigDecimal deductionAmount
+        +BigDecimal netAmount
+        +PayrollStatus status
+        +Long createdBy
+        +LocalDateTime createdAt
+        +LocalDateTime updatedAt
+    }
+
+    class PayrollStatus {
+        <<enumeration>>
+        DRAFT
+        APPROVED
+        PAID
+    }
+
+    class FlipperDevice {
+        +Long id
+        +String flipperId
+        +Long userId
+        +String secret
+    }
+
+    class AuthSession {
+        +Long id
+        +Long userId
+        +String challenge
+        +AuthAction action
+        +LocalDateTime expiresAt
+        +boolean used
+        +boolean success
+        +Integer breakMinutes
+    }
+
     class MediaReport {
         <<MongoDB Document>>
         +String id
@@ -273,10 +330,12 @@ classDiagram
     WorkOrder "1" o-- "0..*" OrderEmployee : zugeordnete Mitarbeiter
     OrderEmployee --> OrderEmployeeId
     WorkPlan --> WorkPlanStatus
+    WorkPlan --> HourBudget : nutzt HR-Freigabe
     WorkPlan "1" *-- "0..*" Shift : enthält
     Absence --> AbsenceType
     Absence --> AbsenceStatus
     Invoice --> InvoiceStatus
+    PayrollStatement --> PayrollStatus
     Invoice "1" *-- "0..*" InvoicePosition : hat
 ```
 
@@ -319,10 +378,22 @@ erDiagram
         bigint order_id FK
         bigint employee_id FK
     }
+    hour_budgets {
+        bigint id PK
+        bigint shift_lead_id FK
+        int budget_year
+        int budget_month
+        decimal approved_hours
+        bigint created_by FK
+        varchar notes
+        datetime created_at
+        datetime updated_at
+    }
     work_plans {
         bigint id PK
         varchar title
         bigint shift_lead_id FK
+        bigint hour_budget_id FK
         date startDate
         date endDate
         decimal approvedHours
@@ -378,10 +449,49 @@ erDiagram
         decimal rate
         decimal subtotal
     }
+    payroll_statements {
+        bigint id PK
+        bigint employee_id FK
+        int payroll_year
+        int payroll_month
+        decimal hourly_rate
+        decimal total_hours
+        decimal gross_amount
+        decimal bonus_amount
+        decimal deduction_amount
+        decimal net_amount
+        varchar status
+        bigint created_by FK
+        datetime created_at
+        datetime updated_at
+    }
+    flipper_device {
+        bigint id PK
+        varchar flipper_id UK
+        bigint user_id FK
+        varchar secret
+    }
+    auth_session {
+        bigint id PK
+        bigint user_id FK
+        varchar challenge UK
+        varchar action
+        datetime expires_at
+        boolean used
+        boolean success
+        int break_minutes
+    }
+    used_nonce {
+        bigint id PK
+        varchar nonce UK
+        varchar flipper_id
+        datetime created_at
+    }
 
     roles ||--o{ users : "hat"
     users ||--o{ orders : "erstellt (createdBy)"
     users ||--o{ order_employees : "zugeordnet"
+    users ||--o{ hour_budgets : "erhält Freigabe"
     users ||--o{ work_plans : "leitet (shiftLeadId)"
     users ||--o{ shifts : "eingeplant in"
     users ||--o{ time_entries : "hat"
@@ -389,8 +499,12 @@ erDiagram
     orders ||--o{ order_employees : "enthält"
     orders ||--o{ shifts : "referenziert in"
     orders ||--o{ invoices : "abgerechnet via"
+    hour_budgets ||--o{ work_plans : "Kontingent für"
     work_plans ||--o{ shifts : "enthält"
     invoices ||--o{ invoice_positions : "hat"
+    users ||--o{ payroll_statements : "Lohnauszug"
+    users ||--o{ flipper_device : "hat"
+    users ||--o{ auth_session : "startet"
 ```
 
 ---
@@ -526,12 +640,22 @@ sequenceDiagram
     participant PS as Planning Service :8004
     participant DB as MySQL
 
+    participant HRWeb as HR Web :3002
+
+    HRWeb->>GW: POST /api/planning/hour-budgets\n{shiftLeadId, year, month, approvedHours}
+    GW->>PS: POST /api/planning/hour-budgets
+    PS->>DB: INSERT/UPDATE hour_budgets
+    DB-->>PS: HourBudget {id, approvedHours}
+    PS-->>HRWeb: 201 HourBudget
+
     Schichtleiter->>SLWeb: Neuen Arbeitsplan anlegen
-    SLWeb->>GW: POST /api/planning/workplans\n{title, shiftLeadId, startDate, endDate, approvedHours}
+    SLWeb->>GW: POST /api/planning/workplans\n{title, shiftLeadId, startDate, endDate}
     GW->>PS: POST /api/planning/workplans
-    PS->>DB: INSERT work_plans (status=DRAFT)
+    PS->>DB: SELECT hour_budgets für shiftLeadId + Monat
+    DB-->>PS: HourBudget {approvedHours}
+    PS->>DB: INSERT work_plans (hour_budget_id, approved_hours, status=DRAFT)
     DB-->>PS: WorkPlan {id}
-    PS-->>SLWeb: 201 {id, status: DRAFT}
+    PS-->>SLWeb: 201 {id, status: DRAFT, approvedHours}
 
     loop Schichten hinzufügen
         Schichtleiter->>SLWeb: Schicht hinzufügen (Mitarbeiter, Datum, Zeit, Auftrag)

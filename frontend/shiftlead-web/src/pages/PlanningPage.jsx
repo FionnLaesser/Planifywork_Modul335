@@ -45,6 +45,11 @@ export default function PlanningPage() {
     [workPlanForm.startDate, hourBudgets]
   );
 
+  const isSameMonthPlan = useMemo(
+    () => sameMonth(workPlanForm.startDate, workPlanForm.endDate),
+    [workPlanForm.startDate, workPlanForm.endDate]
+  );
+
   const loadWorkPlans = async () => {
     if (!shiftLeadId) {
       setError('Keine Schichtleiter-ID im Login gefunden. Bitte neu einloggen.');
@@ -113,6 +118,15 @@ export default function PlanningPage() {
     setError('');
     setSuccess('');
     try {
+      if (!isSameMonthPlan) {
+        setError('Arbeitspläne müssen innerhalb eines einzelnen Monats liegen, weil das HR-Stundenkontingent monatlich freigegeben wird.');
+        return;
+      }
+      if (!selectedBudget) {
+        setError('Für diesen Monat fehlt die HR-Stundenfreigabe. Bitte zuerst im HR-Web ein Stundenkontingent erfassen.');
+        return;
+      }
+
       const payload = {
         title: workPlanForm.title.trim(),
         shiftLeadId: Number(shiftLeadId),
@@ -232,11 +246,13 @@ export default function PlanningPage() {
               </div>
               <div style={{ padding: 12, border: '1px solid #dbeafe', background: '#eff6ff', borderRadius: 8, color: '#1e3a8a', fontSize: 14 }}>
                 <b>HR-Stundenkontingent:</b>{' '}
-                {selectedBudget
-                  ? `${formatHours(selectedBudget.approvedHours)} h für ${String(selectedBudget.month).padStart(2, '0')}.${selectedBudget.year}`
-                  : 'Für diesen Monat wurde von HR noch kein Stundenkontingent freigegeben.'}
+                {!isSameMonthPlan
+                  ? 'Arbeitspläne müssen innerhalb eines Monats liegen.'
+                  : selectedBudget
+                    ? `${formatHours(selectedBudget.approvedHours)} h für ${String(selectedBudget.month).padStart(2, '0')}.${selectedBudget.year}`
+                    : 'Für diesen Monat wurde von HR noch kein Stundenkontingent freigegeben.'}
               </div>
-              <button type="submit" disabled={saving || !selectedBudget} style={selectedBudget ? btnPrimary : btnDisabled}>
+              <button type="submit" disabled={saving || !selectedBudget || !isSameMonthPlan} style={selectedBudget && isSameMonthPlan ? btnPrimary : btnDisabled}>
                 Arbeitsplan erstellen
               </button>
             </form>
@@ -483,6 +499,13 @@ function budgetForDate(dateValue, budgets) {
   const year = date.getFullYear();
   const month = date.getMonth() + 1;
   return budgets.find(budget => Number(budget.year) === year && Number(budget.month) === month) || null;
+}
+
+function sameMonth(startValue, endValue) {
+  if (!startValue || !endValue) return false;
+  const start = new Date(`${startValue}T00:00:00`);
+  const end = new Date(`${endValue}T00:00:00`);
+  return start.getFullYear() === end.getFullYear() && start.getMonth() === end.getMonth();
 }
 
 function orderTitle(orderId, orders) {

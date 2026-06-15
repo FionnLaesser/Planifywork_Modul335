@@ -417,11 +417,13 @@ Jede React-App hat dieselbe interne Struktur:
 | `/api/absences/**` | absence-vacation-service :8006 |
 | `/api/billing/**` | billing-service :8007   |
 | `/api/media/**` | report-media-service :8008|
+| `/api/flipper-auth/**` | flipper-auth-service :8009 |
 
-**Noch zu implementieren:**
-- JWT-Filter (Token prüfen, bevor Anfrage weitergeleitet wird)
-- CORS-Konfiguration für alle Frontends
-- Rate Limiting (optional)
+**Hinweis zur Integration:**
+- Das Gateway leitet alle `/api/**`-Requests an die passenden Microservices weiter.
+- JWT-Header werden durchgereicht; die rollenbasierte Prüfung passiert in den jeweiligen Services per Spring Security.
+- CORS ist für Admin, HR, Schichtleiter und Flipper-Web konfiguriert.
+- Rate Limiting bleibt optional.
 
 ---
 
