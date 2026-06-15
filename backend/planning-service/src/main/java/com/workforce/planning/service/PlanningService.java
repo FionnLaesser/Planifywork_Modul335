@@ -1,14 +1,18 @@
 package com.workforce.planning.service;
 
+import com.workforce.planning.dto.CreateHourBudgetRequest;
 import com.workforce.planning.dto.CreateShiftRequest;
 import com.workforce.planning.dto.CreateWorkPlanRequest;
+import com.workforce.planning.dto.HourBudgetResponse;
 import com.workforce.planning.dto.ShiftResponse;
 import com.workforce.planning.dto.UpdateWorkPlanRequest;
 import com.workforce.planning.dto.WorkPlanResponse;
 import com.workforce.planning.exception.ResourceNotFoundException;
+import com.workforce.planning.model.HourBudget;
 import com.workforce.planning.model.Shift;
 import com.workforce.planning.model.WorkPlan;
 import com.workforce.planning.model.WorkPlanStatus;
+import com.workforce.planning.repository.HourBudgetRepository;
 import com.workforce.planning.repository.ShiftRepository;
 import com.workforce.planning.repository.WorkPlanRepository;
 import lombok.RequiredArgsConstructor;
@@ -24,11 +28,11 @@ import java.time.YearMonth;
 import java.util.List;
 
 /**
- * Service-Klasse für Arbeitspläne und Schichten.
+ * Service-Klasse für Arbeitspläne, Schichten und HR-Stundenfreigaben.
  *
- * <p>Implementiert die besprochenen Kernfunktionen:
- * Arbeitsplan erstellen, Schichten hinzufügen, geplante Stunden berechnen,
- * Warnungen bei Über-/Unterplanung und Mitarbeiter-Kalender bereitstellen.</p>
+ * <p>HR erstellt zuerst ein Monatskontingent. Schichtleiter erstellen danach Arbeitspläne,
+ * die automatisch dieses freigegebene Kontingent übernehmen. Dadurch kann der Schichtleiter
+ * nicht mehr selbst bestimmen, wie viele Stunden freigegeben sind.</p>
  */
 @Service
 @RequiredArgsConstructor
@@ -38,18 +42,50 @@ public class PlanningService {
 
     private final WorkPlanRepository workPlanRepository;
     private final ShiftRepository shiftRepository;
+    private final HourBudgetRepository hourBudgetRepository;
 
-    /** Erstellt einen neuen Arbeitsplan mit HR-Stundenkontingent. */
+    /** Erstellt oder aktualisiert eine HR-Stundenfreigabe für einen Schichtleiter und Monat. */
+    @Transactional
+    public HourBudgetResponse saveHourBudget(CreateHourBudgetRequest request) {
+        validateHourBudgetRequest(request);
+
+        HourBudget budget = hourBudgetRepository
+                .findByShiftLeadIdAndYearAndMonth(request.shiftLeadId(), request.year(), request.month())
+                .orElseGet(HourBudget::new);
+
+        budget.setShiftLeadId(request.shiftLeadId());
+        budget.setYear(request.year());
+        budget.setMonth(request.month());
+        budget.setApprovedHours(normalizeHours(request.approvedHours()));
+        budget.setCreatedBy(request.createdBy());
+        budget.setNotes(normalizeText(request.notes()));
+
+        return HourBudgetResponse.from(hourBudgetRepository.save(budget));
+    }
+
+    /** Gibt HR-Stundenfreigaben zurück; optional gefiltert nach Schichtleiter. */
+    @Transactional(readOnly = true)
+    public List<HourBudgetResponse> getHourBudgets(Long shiftLeadId) {
+        List<HourBudget> budgets = shiftLeadId != null
+                ? hourBudgetRepository.findByShiftLeadIdOrderByYearDescMonthDesc(shiftLeadId)
+                : hourBudgetRepository.findAllByOrderByYearDescMonthDescShiftLeadIdAsc();
+
+        return budgets.stream().map(HourBudgetResponse::from).toList();
+    }
+
+    /** Erstellt einen neuen Arbeitsplan und übernimmt das HR-Stundenkontingent automatisch. */
     @Transactional
     public WorkPlanResponse createWorkPlan(CreateWorkPlanRequest request) {
         validateCreateWorkPlanRequest(request);
+        HourBudget budget = findMatchingBudget(request.shiftLeadId(), request.startDate(), request.endDate());
 
         WorkPlan workPlan = new WorkPlan();
         workPlan.setTitle(request.title().trim());
         workPlan.setShiftLeadId(request.shiftLeadId());
+        workPlan.setHourBudgetId(budget.getId());
         workPlan.setStartDate(request.startDate());
         workPlan.setEndDate(request.endDate());
-        workPlan.setApprovedHours(normalizeHours(request.approvedHours()));
+        workPlan.setApprovedHours(normalizeHours(budget.getApprovedHours()));
         workPlan.setStatus(WorkPlanStatus.DRAFT);
 
         WorkPlan saved = workPlanRepository.save(workPlan);
@@ -73,17 +109,19 @@ public class PlanningService {
         return toResponse(workPlan);
     }
 
-    /** Bearbeitet Metadaten eines Arbeitsplan-Entwurfs. */
+    /** Bearbeitet Metadaten eines Arbeitsplan-Entwurfs und übernimmt erneut das passende HR-Kontingent. */
     @Transactional
     public WorkPlanResponse updateWorkPlan(Long workPlanId, UpdateWorkPlanRequest request) {
         WorkPlan workPlan = findWorkPlan(workPlanId);
         ensureDraft(workPlan);
         validateUpdateWorkPlanRequest(request);
+        HourBudget budget = findMatchingBudget(workPlan.getShiftLeadId(), request.startDate(), request.endDate());
 
         workPlan.setTitle(request.title().trim());
         workPlan.setStartDate(request.startDate());
         workPlan.setEndDate(request.endDate());
-        workPlan.setApprovedHours(normalizeHours(request.approvedHours()));
+        workPlan.setHourBudgetId(budget.getId());
+        workPlan.setApprovedHours(normalizeHours(budget.getApprovedHours()));
 
         validateExistingShiftsStillFit(workPlan);
         return toResponse(workPlanRepository.save(workPlan));
@@ -134,25 +172,41 @@ public class PlanningService {
             throw new IllegalArgumentException("employeeId ist erforderlich");
         }
 
-        LocalDate start = from != null ? from : YearMonth.now().atDay(1);
-        LocalDate end = to != null ? to : YearMonth.now().atEndOfMonth();
+        YearMonth currentMonth = YearMonth.now();
+        LocalDate effectiveFrom = from != null ? from : currentMonth.atDay(1);
+        LocalDate effectiveTo = to != null ? to : currentMonth.atEndOfMonth();
 
-        if (end.isBefore(start)) {
+        if (effectiveTo.isBefore(effectiveFrom)) {
             throw new IllegalArgumentException("to darf nicht vor from liegen");
         }
 
-        return shiftRepository.findCalendarShifts(employeeId, start, end, WorkPlanStatus.PUBLISHED)
+        return shiftRepository
+                .findCalendarShifts(employeeId, effectiveFrom, effectiveTo, WorkPlanStatus.PUBLISHED)
                 .stream()
                 .map(shift -> ShiftResponse.from(shift, calculateShiftHours(shift)))
                 .toList();
     }
 
     private WorkPlan findWorkPlan(Long id) {
-        if (id == null) {
-            throw new IllegalArgumentException("workPlanId ist erforderlich");
-        }
         return workPlanRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Arbeitsplan " + id + " wurde nicht gefunden"));
+                .orElseThrow(() -> new ResourceNotFoundException("Arbeitsplan mit ID " + id + " nicht gefunden"));
+    }
+
+    private HourBudget findMatchingBudget(Long shiftLeadId, LocalDate startDate, LocalDate endDate) {
+        YearMonth period = validateMonthlyPeriod(startDate, endDate);
+        return hourBudgetRepository
+                .findByShiftLeadIdAndYearAndMonth(shiftLeadId, period.getYear(), period.getMonthValue())
+                .orElseThrow(() -> new IllegalStateException(
+                        "Kein HR-Stundenkontingent für Schichtleiter " + shiftLeadId + " und Monat " + period + " freigegeben"));
+    }
+
+    private YearMonth validateMonthlyPeriod(LocalDate startDate, LocalDate endDate) {
+        YearMonth startMonth = YearMonth.from(startDate);
+        YearMonth endMonth = YearMonth.from(endDate);
+        if (!startMonth.equals(endMonth)) {
+            throw new IllegalArgumentException("Arbeitspläne müssen innerhalb eines freigegebenen Monats liegen");
+        }
+        return startMonth;
     }
 
     private WorkPlanResponse toResponse(WorkPlan workPlan) {
@@ -161,8 +215,8 @@ public class PlanningService {
                 .map(shift -> ShiftResponse.from(shift, calculateShiftHours(shift)))
                 .toList();
 
-        BigDecimal plannedHours = shifts.stream()
-                .map(this::calculateShiftHours)
+        BigDecimal plannedHours = shiftResponses.stream()
+                .map(ShiftResponse::plannedHours)
                 .reduce(BigDecimal.ZERO, BigDecimal::add)
                 .setScale(2, RoundingMode.HALF_UP);
 
@@ -191,6 +245,24 @@ public class PlanningService {
                 .divide(BigDecimal.valueOf(60), 2, RoundingMode.HALF_UP);
     }
 
+    private void validateHourBudgetRequest(CreateHourBudgetRequest request) {
+        if (request == null) {
+            throw new IllegalArgumentException("Request darf nicht leer sein");
+        }
+        if (request.shiftLeadId() == null) {
+            throw new IllegalArgumentException("shiftLeadId ist erforderlich");
+        }
+        if (request.year() == null || request.year() < 2000) {
+            throw new IllegalArgumentException("year ist erforderlich und muss gültig sein");
+        }
+        if (request.month() == null || request.month() < 1 || request.month() > 12) {
+            throw new IllegalArgumentException("month muss zwischen 1 und 12 liegen");
+        }
+        if (request.approvedHours() == null || request.approvedHours().compareTo(BigDecimal.ZERO) < 0) {
+            throw new IllegalArgumentException("approvedHours ist erforderlich und darf nicht negativ sein");
+        }
+    }
+
     private void validateCreateWorkPlanRequest(CreateWorkPlanRequest request) {
         if (request == null) {
             throw new IllegalArgumentException("Request darf nicht leer sein");
@@ -198,20 +270,17 @@ public class PlanningService {
         if (request.shiftLeadId() == null) {
             throw new IllegalArgumentException("shiftLeadId ist erforderlich");
         }
-        validateWorkPlanFields(request.title(), request.startDate(), request.endDate(), request.approvedHours());
+        validateWorkPlanFields(request.title(), request.startDate(), request.endDate());
     }
 
     private void validateUpdateWorkPlanRequest(UpdateWorkPlanRequest request) {
         if (request == null) {
             throw new IllegalArgumentException("Request darf nicht leer sein");
         }
-        validateWorkPlanFields(request.title(), request.startDate(), request.endDate(), request.approvedHours());
+        validateWorkPlanFields(request.title(), request.startDate(), request.endDate());
     }
 
-    private void validateWorkPlanFields(String title,
-                                        LocalDate startDate,
-                                        LocalDate endDate,
-                                        BigDecimal approvedHours) {
+    private void validateWorkPlanFields(String title, LocalDate startDate, LocalDate endDate) {
         if (title == null || title.isBlank()) {
             throw new IllegalArgumentException("Titel ist erforderlich");
         }
@@ -220,9 +289,6 @@ public class PlanningService {
         }
         if (endDate.isBefore(startDate)) {
             throw new IllegalArgumentException("endDate darf nicht vor startDate liegen");
-        }
-        if (approvedHours != null && approvedHours.compareTo(BigDecimal.ZERO) < 0) {
-            throw new IllegalArgumentException("approvedHours darf nicht negativ sein");
         }
     }
 

@@ -54,6 +54,14 @@ public interface TimeEntryRepository extends JpaRepository<TimeEntry, Long> {
     Optional<TimeEntry> findFirstByEmployeeIdAndEntryDateOrderByCheckInDesc(
             Long employeeId, LocalDate entryDate);
 
+    /** Gibt abgeschlossene Zeiteinträge in einem Datumsbereich zurück. */
+    List<TimeEntry> findByEntryDateBetweenAndCheckOutIsNotNullOrderByEntryDateDesc(
+            LocalDate from, LocalDate to);
+
+    /** Gibt abgeschlossene Zeiteinträge eines Mitarbeiters in einem Datumsbereich zurück. */
+    List<TimeEntry> findByEmployeeIdAndEntryDateBetweenAndCheckOutIsNotNullOrderByEntryDateDesc(
+            Long employeeId, LocalDate from, LocalDate to);
+
     /**
      * Berechnet die Gesamtstunden aller Mitarbeiter in einem Datumsbereich.
      * Gibt pro Mitarbeiter eine Zeile mit der Summer der Stunden zurück.

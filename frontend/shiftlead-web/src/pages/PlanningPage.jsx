@@ -10,7 +10,6 @@ const emptyWorkPlanForm = {
   title: `Monatsplan ${today.toLocaleDateString('de-CH', { month: 'long', year: 'numeric' })}`,
   startDate: currentMonthStart,
   endDate: currentMonthEnd,
-  approvedHours: '1000',
 };
 
 const emptyShiftForm = {
@@ -28,6 +27,7 @@ export default function PlanningPage() {
   const [selectedId, setSelectedId] = useState(null);
   const [employees, setEmployees] = useState([]);
   const [orders, setOrders] = useState([]);
+  const [hourBudgets, setHourBudgets] = useState([]);
   const [workPlanForm, setWorkPlanForm] = useState(emptyWorkPlanForm);
   const [shiftForm, setShiftForm] = useState(emptyShiftForm);
   const [loading, setLoading] = useState(false);
@@ -38,6 +38,11 @@ export default function PlanningPage() {
   const selectedWorkPlan = useMemo(
     () => workPlans.find(plan => plan.id === selectedId) || workPlans[0] || null,
     [workPlans, selectedId]
+  );
+
+  const selectedBudget = useMemo(
+    () => budgetForDate(workPlanForm.startDate, hourBudgets),
+    [workPlanForm.startDate, hourBudgets]
   );
 
   const loadWorkPlans = async () => {
@@ -56,6 +61,17 @@ export default function PlanningPage() {
       setError(readError(err, 'Arbeitspläne konnten nicht geladen werden.'));
     } finally {
       setLoading(false);
+    }
+  };
+
+
+  const loadHourBudgets = async () => {
+    if (!shiftLeadId) return;
+    try {
+      const { data } = await api.get('/api/planning/hour-budgets', { params: { shiftLeadId } });
+      setHourBudgets(data || []);
+    } catch {
+      setHourBudgets([]);
     }
   };
 
@@ -83,6 +99,7 @@ export default function PlanningPage() {
     loadWorkPlans();
     loadEmployees();
     loadOrders();
+    loadHourBudgets();
   }, []);
 
   const createWorkPlan = async (event) => {
@@ -101,7 +118,6 @@ export default function PlanningPage() {
         shiftLeadId: Number(shiftLeadId),
         startDate: workPlanForm.startDate,
         endDate: workPlanForm.endDate,
-        approvedHours: Number(workPlanForm.approvedHours || 0),
       };
       const { data } = await api.post('/api/planning/workplans', payload);
       setWorkPlans(previous => [data, ...previous]);
@@ -214,19 +230,13 @@ export default function PlanningPage() {
                   />
                 </label>
               </div>
-              <label style={labelStyle}>
-                HR-Stundenkontingent
-                <input
-                  type="number"
-                  min="0"
-                  step="0.25"
-                  value={workPlanForm.approvedHours}
-                  onChange={e => setWorkPlanForm({ ...workPlanForm, approvedHours: e.target.value })}
-                  style={inputStyle}
-                  required
-                />
-              </label>
-              <button type="submit" disabled={saving} style={btnPrimary}>
+              <div style={{ padding: 12, border: '1px solid #dbeafe', background: '#eff6ff', borderRadius: 8, color: '#1e3a8a', fontSize: 14 }}>
+                <b>HR-Stundenkontingent:</b>{' '}
+                {selectedBudget
+                  ? `${formatHours(selectedBudget.approvedHours)} h für ${String(selectedBudget.month).padStart(2, '0')}.${selectedBudget.year}`
+                  : 'Für diesen Monat wurde von HR noch kein Stundenkontingent freigegeben.'}
+              </div>
+              <button type="submit" disabled={saving || !selectedBudget} style={selectedBudget ? btnPrimary : btnDisabled}>
                 Arbeitsplan erstellen
               </button>
             </form>
@@ -235,7 +245,7 @@ export default function PlanningPage() {
           <section style={panelStyle}>
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center' }}>
               <h2 style={sectionTitle}>Meine Arbeitspläne</h2>
-              <button onClick={loadWorkPlans} disabled={loading} style={btnSmall}>Aktualisieren</button>
+              <button onClick={() => { loadWorkPlans(); loadHourBudgets(); }} disabled={loading} style={btnSmall}>Aktualisieren</button>
             </div>
             {loading && <p style={hintStyle}>Lade Arbeitspläne…</p>}
             {!loading && workPlans.length === 0 && <p style={hintStyle}>Noch keine Arbeitspläne vorhanden.</p>}
@@ -464,6 +474,15 @@ function Stat({ label, value, tone = 'normal' }) {
 function readError(err, fallback) {
   const message = err?.response?.data?.message || err?.response?.data?.error;
   return message || fallback;
+}
+
+
+function budgetForDate(dateValue, budgets) {
+  if (!dateValue) return null;
+  const date = new Date(`${dateValue}T00:00:00`);
+  const year = date.getFullYear();
+  const month = date.getMonth() + 1;
+  return budgets.find(budget => Number(budget.year) === year && Number(budget.month) === month) || null;
 }
 
 function orderTitle(orderId, orders) {

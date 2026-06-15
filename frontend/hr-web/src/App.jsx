@@ -4,6 +4,8 @@ import DashboardPage from './pages/DashboardPage';
 import UsersPage    from './pages/UsersPage';
 import TimePage     from './pages/TimePage';
 import InvoicesPage from './pages/InvoicesPage';
+import HourBudgetsPage from './pages/HourBudgetsPage';
+import PayrollPage from './pages/PayrollPage';
 import AbsencesPage from './pages/AbsencesPage';
 
 function ProtectedRoute({ children }) {
@@ -22,6 +24,8 @@ export default function App() {
           <Route path="/users"     element={<ProtectedRoute><UsersPage /></ProtectedRoute>} />
           <Route path="/time"      element={<ProtectedRoute><TimePage /></ProtectedRoute>} />
           <Route path="/invoices"  element={<ProtectedRoute><InvoicesPage /></ProtectedRoute>} />
+          <Route path="/hour-budgets" element={<ProtectedRoute><HourBudgetsPage /></ProtectedRoute>} />
+          <Route path="/payroll"   element={<ProtectedRoute><PayrollPage /></ProtectedRoute>} />
           <Route path="/absences"  element={<ProtectedRoute><AbsencesPage /></ProtectedRoute>} />
           <Route path="/"          element={<Navigate to="/dashboard" replace />} />
         </Routes>

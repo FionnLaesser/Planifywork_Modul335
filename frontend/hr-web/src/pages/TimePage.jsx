@@ -14,13 +14,18 @@ export default function TimePage() {
   const [month, setMonth]                 = useState(today.getMonth() + 1);
   const [year, setYear]                   = useState(today.getFullYear());
   const [monthEntries, setMonthEntries]   = useState([]);
+  const [breakViolations, setBreakViolations] = useState([]);
   const [error, setError]                 = useState('');
 
   const loadTotal = async () => {
     setError('');
     try {
-      const { data } = await api.get('/api/time/total', { params: { from, to } });
-      setTotalHours(data);
+      const [totalRes, violationRes] = await Promise.all([
+        api.get('/api/time/total', { params: { from, to } }),
+        api.get('/api/time/break-violations', { params: { from, to } }),
+      ]);
+      setTotalHours(totalRes.data);
+      setBreakViolations(violationRes.data || []);
     } catch {
       setError('Fehler beim Laden der Stundenübersicht');
     }
@@ -61,6 +66,18 @@ export default function TimePage() {
           <button onClick={loadTotal} style={btnPrimary}>Laden</button>
         </div>
 
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12, marginBottom: 16 }}>
+          <div style={metricStyle}>
+            <strong>{totalHours.length}</strong>
+            <span>Mitarbeiter mit Stunden</span>
+          </div>
+          <div style={metricStyle}>
+            <strong>{breakViolations.length}</strong>
+            <span>Pausenverstösse</span>
+          </div>
+        </div>
+
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead>
             <tr style={{ background: '#f4f4f4' }}>
@@ -76,6 +93,34 @@ export default function TimePage() {
               <tr key={row.employeeId} style={{ borderBottom: '1px solid #e0e0e0' }}>
                 <td style={td}>{row.employeeId}</td>
                 <td style={td}><b>{Number(row.totalHours).toFixed(2)} h</b></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </section>
+
+
+      <section style={{ marginBottom: 48 }}>
+        <h3>Pausenverstösse</h3>
+        <p style={{ color: '#607080', fontSize: 14 }}>Regel: mehr als 6 Stunden Arbeit = mindestens 30 Minuten Pause, mehr als 9 Stunden = mindestens 45 Minuten Pause.</p>
+        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <thead>
+            <tr style={{ background: '#f4f4f4' }}>
+              {['Datum', 'Mitarbeiter-ID', 'Pause', 'Erforderlich', 'Stunden', 'Hinweis'].map(h => <th key={h} style={th}>{h}</th>)}
+            </tr>
+          </thead>
+          <tbody>
+            {breakViolations.length === 0 && (
+              <tr><td colSpan={6} style={{ ...td, color: '#888', textAlign: 'center' }}>Keine Pausenverstösse im gewählten Zeitraum</td></tr>
+            )}
+            {breakViolations.map(row => (
+              <tr key={row.id} style={{ borderBottom: '1px solid #e0e0e0' }}>
+                <td style={td}>{row.entryDate}</td>
+                <td style={td}>{row.employeeId}</td>
+                <td style={td}>{row.breakMinutes ?? 0} min</td>
+                <td style={td}><b>{row.requiredBreakMinutes} min</b></td>
+                <td style={td}>{row.totalHours != null ? `${Number(row.totalHours).toFixed(2)} h` : '—'}</td>
+                <td style={td}>{row.message}</td>
               </tr>
             ))}
           </tbody>
@@ -143,3 +188,4 @@ const inputStyle = { padding: '9px 10px', border: '1px solid #c8d0d9', borderRad
 const btnPrimary = { padding: '9px 12px', background: '#1f7a8c', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 14, fontWeight: 650 };
 const th = { padding: '12px', textAlign: 'left', fontWeight: 700, fontSize: 12 };
 const td = { padding: '12px', fontSize: 14 };
+const metricStyle = { padding: 14, border: '1px solid #e0e6ed', borderRadius: 8, background: '#f8fafc', display: 'grid', gap: 4 };

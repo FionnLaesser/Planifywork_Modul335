@@ -1,7 +1,9 @@
 package com.workforce.billing.controller;
 
 import com.workforce.billing.dto.CreateInvoiceRequest;
+import com.workforce.billing.dto.CreatePayrollStatementRequest;
 import com.workforce.billing.dto.InvoiceResponse;
+import com.workforce.billing.dto.PayrollStatementResponse;
 import com.workforce.billing.service.BillingService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -94,4 +96,41 @@ public class BillingController {
     public ResponseEntity<InvoiceResponse> pay(@PathVariable Long id) {
         return ResponseEntity.ok(billingService.markPaid(id));
     }
+    /** Gibt alle Lohnauszüge zurück, optional gefiltert nach Status. */
+    @GetMapping("/payroll-statements")
+    @PreAuthorize("hasAnyRole('HR', 'ADMIN')")
+    public ResponseEntity<List<PayrollStatementResponse>> getPayrollStatements(
+            @RequestParam(required = false) String status) {
+        return ResponseEntity.ok(billingService.getPayrollStatements(status));
+    }
+
+    /** Gibt einen einzelnen Lohnauszug zurück. */
+    @GetMapping("/payroll-statements/{id}")
+    @PreAuthorize("hasAnyRole('HR', 'ADMIN')")
+    public ResponseEntity<PayrollStatementResponse> getPayrollStatement(@PathVariable Long id) {
+        return ResponseEntity.ok(billingService.getPayrollStatement(id));
+    }
+
+    /** Erstellt oder berechnet einen monatlichen Lohnauszug aus den erfassten Arbeitsstunden. */
+    @PostMapping("/payroll-statements")
+    @PreAuthorize("hasAnyRole('HR', 'ADMIN')")
+    public ResponseEntity<PayrollStatementResponse> createPayrollStatement(
+            @RequestBody CreatePayrollStatementRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(billingService.createPayrollStatement(request));
+    }
+
+    /** Gibt einen Lohnauszug frei. */
+    @PutMapping("/payroll-statements/{id}/approve")
+    @PreAuthorize("hasAnyRole('HR', 'ADMIN')")
+    public ResponseEntity<PayrollStatementResponse> approvePayrollStatement(@PathVariable Long id) {
+        return ResponseEntity.ok(billingService.approvePayrollStatement(id));
+    }
+
+    /** Markiert einen Lohnauszug als bezahlt. */
+    @PutMapping("/payroll-statements/{id}/pay")
+    @PreAuthorize("hasAnyRole('HR', 'ADMIN')")
+    public ResponseEntity<PayrollStatementResponse> payPayrollStatement(@PathVariable Long id) {
+        return ResponseEntity.ok(billingService.payPayrollStatement(id));
+    }
+
 }

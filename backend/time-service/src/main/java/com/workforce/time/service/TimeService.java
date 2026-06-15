@@ -112,6 +112,47 @@ public class TimeService {
                 .map(TimeEntryResponse::from);
     }
 
+
+    /**
+     * Gibt erkannte Pausenverstösse in einem Datumsbereich zurück.
+     * Regel: > 6h Brutto-Arbeitszeit = mind. 30 Min Pause, > 9h = mind. 45 Min Pause.
+     */
+    @Transactional(readOnly = true)
+    public List<BreakViolationResponse> getBreakViolations(LocalDate from, LocalDate to, Long employeeId) {
+        if (to.isBefore(from)) {
+            throw new IllegalArgumentException("to darf nicht vor from liegen");
+        }
+
+        List<TimeEntry> entries = employeeId != null
+                ? timeEntryRepository.findByEmployeeIdAndEntryDateBetweenAndCheckOutIsNotNullOrderByEntryDateDesc(employeeId, from, to)
+                : timeEntryRepository.findByEntryDateBetweenAndCheckOutIsNotNullOrderByEntryDateDesc(from, to);
+
+        return entries.stream()
+                .filter(this::hasBreakViolation)
+                .map(entry -> BreakViolationResponse.from(entry, requiredBreakMinutes(entry)))
+                .toList();
+    }
+
+    private boolean hasBreakViolation(TimeEntry entry) {
+        int required = requiredBreakMinutes(entry);
+        int actual = entry.getBreakMinutes() == null ? 0 : entry.getBreakMinutes();
+        return required > 0 && actual < required;
+    }
+
+    private int requiredBreakMinutes(TimeEntry entry) {
+        if (entry.getCheckIn() == null || entry.getCheckOut() == null) {
+            return 0;
+        }
+        long grossMinutes = ChronoUnit.MINUTES.between(entry.getCheckIn(), entry.getCheckOut());
+        if (grossMinutes > 9 * 60) {
+            return 45;
+        }
+        if (grossMinutes > 6 * 60) {
+            return 30;
+        }
+        return 0;
+    }
+
     /**
      * Erfasst einen Check-in für einen Mitarbeiter.
      * Es darf nur ein offener Check-in pro Tag existieren.
