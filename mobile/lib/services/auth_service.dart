@@ -91,7 +91,7 @@ class AuthService extends ChangeNotifier {
   }
 
   Map<String, String> get authHeaders => {
-        'Authorization': 'Bearer $_token',
+        if (_token != null) 'Authorization': 'Bearer $_token',
         'Content-Type': 'application/json',
       };
 }
