@@ -7,6 +7,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.workforce.planning.repository.HourBudgetRepository;
 import com.workforce.planning.repository.ShiftRepository;
 import com.workforce.planning.repository.WorkPlanRepository;
 import io.jsonwebtoken.Jwts;
@@ -44,14 +45,20 @@ class PlanningControllerTests {
     @Autowired
     private ShiftRepository shiftRepository;
 
+    @Autowired
+    private HourBudgetRepository hourBudgetRepository;
+
     @BeforeEach
     void setUp() {
         shiftRepository.deleteAll();
         workPlanRepository.deleteAll();
+        hourBudgetRepository.deleteAll();
     }
 
     @Test
     void createWorkPlanAsShiftLeadReturns201() throws Exception {
+        createHourBudget(5, 2026, 7, 160);
+
         mockMvc.perform(post("/api/planning/workplans")
                         .header("Authorization", "Bearer " + token("sl.meier", "SHIFT_LEAD"))
                         .contentType(MediaType.APPLICATION_JSON)
@@ -69,6 +76,8 @@ class PlanningControllerTests {
 
     @Test
     void getWorkPlansReturnsAllPlans() throws Exception {
+        createHourBudget(5, 2026, 7, 80);
+
         mockMvc.perform(post("/api/planning/workplans")
                         .header("Authorization", "Bearer " + token("sl.meier", "SHIFT_LEAD"))
                         .contentType(MediaType.APPLICATION_JSON)
@@ -89,6 +98,8 @@ class PlanningControllerTests {
 
     @Test
     void addShiftToWorkPlanReturnsUpdatedPlan() throws Exception {
+        createHourBudget(7, 2026, 7, 40);
+
         MvcResult createResult = mockMvc.perform(post("/api/planning/workplans")
                         .header("Authorization", "Bearer " + token("sl.meier", "SHIFT_LEAD"))
                         .contentType(MediaType.APPLICATION_JSON)
@@ -121,6 +132,8 @@ class PlanningControllerTests {
 
     @Test
     void publishWorkPlanChangesStatusToPublished() throws Exception {
+        createHourBudget(7, 2026, 7, 40);
+
         MvcResult createResult = mockMvc.perform(post("/api/planning/workplans")
                         .header("Authorization", "Bearer " + token("sl.meier", "SHIFT_LEAD"))
                         .contentType(MediaType.APPLICATION_JSON)
@@ -157,6 +170,8 @@ class PlanningControllerTests {
 
     @Test
     void employeeCanViewPublishedCalendarShifts() throws Exception {
+        createHourBudget(7, 2026, 7, 40);
+
         MvcResult createResult = mockMvc.perform(post("/api/planning/workplans")
                         .header("Authorization", "Bearer " + token("sl.meier", "SHIFT_LEAD"))
                         .contentType(MediaType.APPLICATION_JSON)
@@ -201,6 +216,20 @@ class PlanningControllerTests {
     void requestWithoutTokenReturns401() throws Exception {
         mockMvc.perform(get("/api/planning/workplans"))
                 .andExpect(status().isUnauthorized());
+    }
+
+    private void createHourBudget(int shiftLeadId, int year, int month, int approvedHours) throws Exception {
+        mockMvc.perform(post("/api/planning/hour-budgets")
+                        .header("Authorization", "Bearer " + token("hr.meier", "HR"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "shiftLeadId", shiftLeadId,
+                                "year", year,
+                                "month", month,
+                                "approvedHours", approvedHours
+                        ))))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.shiftLeadId").value(shiftLeadId));
     }
 
     private String token(String username, String role) {
