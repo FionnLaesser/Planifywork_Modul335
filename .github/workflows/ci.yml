@@ -112,9 +112,9 @@ jobs:
         run: npm run build
         working-directory: frontend/${{ matrix.app }}
 
-  # ── Job 3: Backend kompiliert (Maven) ─────────────────────────────────────
-  backend-compile:
-    name: Backend Compile (Maven)
+  # ── Job 3: Backend kompiliert und Unit-Tests (Maven) ──────────────────────
+  backend-test:
+    name: Backend Unit Tests (Maven)
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
@@ -131,3 +131,6 @@ jobs:
 
       - name: Maven compile (alle Services)
         run: mvn compile -q
+
+      - name: Maven test (Services mit H2-Tests)
+        run: mvn test -q -pl backend/auth-service,backend/absence-vacation-service,backend/planning-service,backend/flipper-auth-service
