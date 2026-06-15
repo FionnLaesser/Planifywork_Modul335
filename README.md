@@ -9,6 +9,7 @@ Klasse: Modul 335
 
 | Dokument | Beschreibung |
 |---|---|
+| [UML- & Architekturdiagramme](docs/diagrams.md) | Systemarchitektur, Klassendiagramm, ER-Diagramm, Sequenz- und Statusdiagramme (Mermaid) |
 | [User Stories – HR](docs/userstories_hr.md) | User Stories mit Akzeptanzkriterien für die HR-Rolle |
 | [User Stories – Schichtleiter](docs/userstories_schichtleiter.md) | User Stories mit Akzeptanzkriterien für die Schichtleiter-Rolle |
 | [User Stories – Mitarbeiter](docs/userstories_mitarbeiter.md) | User Stories mit Akzeptanzkriterien für die Mitarbeiter-Rolle |
@@ -283,42 +284,42 @@ Die Testbenutzer werden beim ersten Start des `user-role-service` automatisch in
 
 ## 4. Gesamtarchitektur
 
+```mermaid
+graph TB
+    subgraph Clients["Clients"]
+        AW["React Admin Web\n:3001"]
+        HW["React HR Web\n:3002"]
+        SW["React Schichtleiter Web\n:3003"]
+        MA["Flutter Mobile App\nAndroid / iOS"]
+    end
+
+    subgraph GWLayer["API Gateway"]
+        GW["Spring Cloud Gateway :8000\nJWT-Prüfung · CORS · Routing"]
+    end
+
+    subgraph SVC["Backend Microservices (Spring Boot 3.3)"]
+        AS["Auth Service\n:8001"]
+        URS["User & Role Service\n:8002"]
+        OS["Order Service\n:8003"]
+        PS["Planning Service\n:8004"]
+        TS["Time Service\n:8005"]
+        AVS["Absence Service\n:8006"]
+        BS["Billing Service\n:8007"]
+        RMS["Report/Media Service\n:8008"]
+    end
+
+    subgraph DBLayer["Datenbanken"]
+        MYSQL[("MySQL :3307\nworkforce DB\nBenutzer · Aufträge · Schichten\nZeiten · Absenzen · Rechnungen")]
+        MONGO[("MongoDB :27017\nworkforce-media DB\nBilder · Rapport-Metadaten")]
+    end
+
+    AW & HW & SW & MA --> GW
+    GW --> AS & URS & OS & PS & TS & AVS & BS & RMS
+    AS & URS & OS & PS & TS & AVS & BS --> MYSQL
+    RMS --> MONGO
 ```
-┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐
-│  React          │  │  React          │  │  React          │  │  Flutter        │
-│  Admin Web      │  │  HR Web         │  │  Schichtleiter  │  │  Mobile App     │
-│  :3001          │  │  :3002          │  │  Web :3003      │  │  (Android/iOS)  │
-└────────┬────────┘  └────────┬────────┘  └────────┬────────┘  └────────┬────────┘
-         │                   │                     │                    │
-         └───────────────────┴──────────REST / JSON / JWT───────────────┘
-                                                   │
-                                      ┌────────────▼────────────┐
-                                      │      API Gateway        │
-                                      │   Spring Cloud Gateway  │
-                                      │         :8000           │
-                                      └────────────┬────────────┘
-                                                   │
-          ┌──────────┬──────────┬──────────────────┼──────────────────┬──────────┐
-          │          │          │                  │                  │          │
-     ┌────▼───┐ ┌────▼───┐ ┌───▼────┐        ┌────▼───┐        ┌────▼───┐ ┌────▼───┐
-     │ Auth   │ │ User & │ │ Order  │        │Planning│        │ Time   │ │Absence │
-     │Service │ │ Role   │ │Service │        │Service │        │Service │ │Service │
-     │ :8001  │ │Service │ │ :8003  │        │ :8004  │        │ :8005  │ │ :8006  │
-     └────┬───┘ │ :8002  │ └───┬────┘        └───┬────┘        └───┬────┘ └───┬────┘
-          │     └────┬───┘     │                 │                 │          │
-          │          │         │                 │                 │          │
-     ┌────▼───┐      │    ┌────▼────────────────────────────────────────┐    │
-     │Billing │      │    │                   MySQL :3306               │    │
-     │Service │      └───►│  workforce DB – Benutzer, Rollen, Aufträge, │◄───┘
-     │ :8007  │           │  Schichten, Zeiten, Absenzen, Rechnungen    │
-     └────┬───┘           └─────────────────────────────────────────────┘
-          │
-     ┌────▼────────┐      ┌─────────────────────────────────────────────┐
-     │Report/Media │      │               MongoDB :27017                │
-     │ Service     │─────►│  workforce-media – Bilder, Bild-Metadaten,  │
-     │  :8008      │      │  Rapport-Zuordnungen                        │
-     └─────────────┘      └─────────────────────────────────────────────┘
-```
+
+> Detaillierte Diagramme (ER, Klassendiagramm, Sequenz-, Statusdiagramme) → [docs/diagrams.md](docs/diagrams.md)
 
 ---
 
