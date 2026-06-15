@@ -134,3 +134,6 @@ jobs:
 
       - name: Maven test (Services mit H2-Tests)
         run: mvn test -q -pl backend/auth-service,backend/absence-vacation-service,backend/planning-service,backend/flipper-auth-service
+
+      - name: Konfigurations-Schutztests (Routing, Ports, JWT, ddl-auto)
+        run: mvn test -q -pl backend/api-gateway
