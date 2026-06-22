@@ -9,7 +9,7 @@
 
 const char *WIFI_SSID = "Noo Hotspoooot";
 const char *WIFI_PASSWORD = "12345678";
-const char *BACKEND_BASE_URL = "http://10.184.176.145:8000";
+const char *BACKEND_BASE_URL = "http://10.222.166.145:8000";
 const char *USERNAME = "emp.meier";
 const char *FIRMWARE_VERSION = "planifywork-esp32-2026-06-15-2";
 

@@ -8,18 +8,18 @@ void main() {
   runApp(
     ChangeNotifierProvider(
       create: (_) => AuthService(),
-      child: const WorkforceApp(),
+      child: const PlanifyworkApp(),
     ),
   );
 }
 
-class WorkforceApp extends StatelessWidget {
-  const WorkforceApp({super.key});
+class PlanifyworkApp extends StatelessWidget {
+  const PlanifyworkApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Workforce',
+      title: 'Planifywork',
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
         useMaterial3: true,
