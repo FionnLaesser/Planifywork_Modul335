@@ -99,7 +99,7 @@ services:
       mysql-db:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "nc -w 3 localhost 8001 </dev/null"]
+      test: ["CMD-SHELL", "nc -z localhost 8001"]
       interval: 5s
       timeout: 5s
       retries: 20
@@ -126,7 +126,7 @@ services:
       mysql-db:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "nc -w 3 localhost 8002 </dev/null"]
+      test: ["CMD-SHELL", "nc -z localhost 8002"]
       interval: 5s
       timeout: 5s
       retries: 20
@@ -153,7 +153,7 @@ services:
       mysql-db:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "nc -w 3 localhost 8003 </dev/null"]
+      test: ["CMD-SHELL", "nc -z localhost 8003"]
       interval: 5s
       timeout: 5s
       retries: 20
@@ -180,7 +180,7 @@ services:
       mysql-db:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "nc -w 3 localhost 8004 </dev/null"]
+      test: ["CMD-SHELL", "nc -z localhost 8004"]
       interval: 5s
       timeout: 5s
       retries: 20
@@ -207,7 +207,7 @@ services:
       mysql-db:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "nc -w 3 localhost 8005 </dev/null"]
+      test: ["CMD-SHELL", "nc -z localhost 8005"]
       interval: 5s
       timeout: 5s
       retries: 20
@@ -234,7 +234,7 @@ services:
       mysql-db:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "nc -w 3 localhost 8006 </dev/null"]
+      test: ["CMD-SHELL", "nc -z localhost 8006"]
       interval: 5s
       timeout: 5s
       retries: 20
@@ -261,7 +261,7 @@ services:
       mysql-db:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "nc -w 3 localhost 8007 </dev/null"]
+      test: ["CMD-SHELL", "nc -z localhost 8007"]
       interval: 5s
       timeout: 5s
       retries: 20
@@ -284,7 +284,7 @@ services:
       mongo-db:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "nc -w 3 localhost 8008 </dev/null"]
+      test: ["CMD-SHELL", "nc -z localhost 8008"]
       interval: 5s
       timeout: 5s
       retries: 20
@@ -316,7 +316,7 @@ services:
       user-role-service:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "nc -w 3 localhost 8009 </dev/null"]
+      test: ["CMD-SHELL", "nc -z localhost 8009"]
       interval: 5s
       timeout: 5s
       retries: 20
@@ -343,7 +343,7 @@ services:
       mysql-db:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "nc -w 3 localhost 8010 </dev/null"]
+      test: ["CMD-SHELL", "nc -z localhost 8010"]
       interval: 5s
       timeout: 5s
       retries: 20
@@ -383,7 +383,7 @@ services:
       flipper-auth-service:
         condition: service_started
     healthcheck:
-      test: ["CMD-SHELL", "nc -w 3 localhost 8000 </dev/null"]
+      test: ["CMD-SHELL", "nc -z localhost 8000"]
       interval: 5s
       timeout: 5s
       retries: 12
