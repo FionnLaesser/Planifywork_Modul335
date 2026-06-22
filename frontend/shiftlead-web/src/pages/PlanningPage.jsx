@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import Layout from '../components/Layout';
 import api from '../services/api';
 
@@ -33,7 +33,9 @@ export default function PlanningPage() {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [budgetError, setBudgetError] = useState('');
   const [success, setSuccess] = useState('');
+  const retried = useRef(false);
 
   const selectedWorkPlan = useMemo(
     () => workPlans.find(plan => plan.id === selectedId) || workPlans[0] || null,
@@ -50,7 +52,7 @@ export default function PlanningPage() {
     [workPlanForm.startDate, workPlanForm.endDate]
   );
 
-  const loadWorkPlans = async () => {
+  const loadWorkPlans = async (isRetry = false) => {
     if (!shiftLeadId) {
       setError('Keine Schichtleiter-ID im Login gefunden. Bitte neu einloggen.');
       return;
@@ -62,8 +64,16 @@ export default function PlanningPage() {
       const { data } = await api.get('/api/planning/workplans', { params: { shiftLeadId } });
       setWorkPlans(data);
       setSelectedId(current => current ?? data[0]?.id ?? null);
+      retried.current = false;
     } catch (err) {
-      setError(readError(err, 'Arbeitspläne konnten nicht geladen werden.'));
+      const msg = readError(err, 'Arbeitspläne konnten nicht geladen werden.');
+      if (!isRetry && !retried.current) {
+        retried.current = true;
+        setError(msg + ' Erneuter Versuch in 5 Sekunden…');
+        setTimeout(() => loadWorkPlans(true), 5000);
+      } else {
+        setError(msg + ' Bitte "Aktualisieren" klicken sobald der Service bereit ist.');
+      }
     } finally {
       setLoading(false);
     }
@@ -75,8 +85,10 @@ export default function PlanningPage() {
     try {
       const { data } = await api.get('/api/planning/hour-budgets', { params: { shiftLeadId } });
       setHourBudgets(data || []);
+      setBudgetError('');
     } catch {
       setHourBudgets([]);
+      setBudgetError('Stundenkontingent konnte nicht geladen werden. Bitte "Aktualisieren" klicken.');
     }
   };
 
@@ -244,13 +256,15 @@ export default function PlanningPage() {
                   />
                 </label>
               </div>
-              <div style={{ padding: 12, border: '1px solid #dbeafe', background: '#eff6ff', borderRadius: 8, color: '#1e3a8a', fontSize: 14 }}>
+              <div style={{ padding: 12, border: `1px solid ${budgetError ? '#fecaca' : '#dbeafe'}`, background: budgetError ? '#fef2f2' : '#eff6ff', borderRadius: 8, color: budgetError ? '#991b1b' : '#1e3a8a', fontSize: 14 }}>
                 <b>HR-Stundenkontingent:</b>{' '}
-                {!isSameMonthPlan
+                {budgetError
+                  ? budgetError
+                  : !isSameMonthPlan
                   ? 'Arbeitspläne müssen innerhalb eines Monats liegen.'
                   : selectedBudget
-                    ? `${formatHours(selectedBudget.approvedHours)} h für ${String(selectedBudget.month).padStart(2, '0')}.${selectedBudget.year}`
-                    : 'Für diesen Monat wurde von HR noch kein Stundenkontingent freigegeben.'}
+                  ? `${formatHours(selectedBudget.approvedHours)} h für ${String(selectedBudget.month).padStart(2, '0')}.${selectedBudget.year}`
+                  : 'Für diesen Monat wurde von HR noch kein Stundenkontingent freigegeben.'}
               </div>
               <button type="submit" disabled={saving || !selectedBudget || !isSameMonthPlan} style={selectedBudget && isSameMonthPlan ? btnPrimary : btnDisabled}>
                 Arbeitsplan erstellen
@@ -261,7 +275,7 @@ export default function PlanningPage() {
           <section style={panelStyle}>
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center' }}>
               <h2 style={sectionTitle}>Meine Arbeitspläne</h2>
-              <button onClick={() => { loadWorkPlans(); loadHourBudgets(); }} disabled={loading} style={btnSmall}>Aktualisieren</button>
+              <button onClick={() => { retried.current = false; setBudgetError(''); loadWorkPlans(); loadHourBudgets(); }} disabled={loading} style={btnSmall}>Aktualisieren</button>
             </div>
             {loading && <p style={hintStyle}>Lade Arbeitspläne…</p>}
             {!loading && workPlans.length === 0 && <p style={hintStyle}>Noch keine Arbeitspläne vorhanden.</p>}

@@ -5,6 +5,17 @@ Klasse: Modul 335
 
 ---
 
+## Änderungshistorie
+
+### 2026-06-22
+- **Docker Compose Startup-Reihenfolge**: Alle Spring-Boot-Services warten nun via `condition: service_healthy` auf MySQL/MongoDB, bevor sie starten. `nc`-basierte Health-Checks wurden wegen BusyBox-Inkompatibilität (SIGALRM Exit-Code) entfernt; stattdessen `service_started` als Abhängigkeitsbedingung für den API-Gateway.
+- **CI-Timeouts erhöht**: Seed-User-Warteschritt 120s → 150s, API-Gateway-Warte-Timeout 90s → 150s, Job-Timeout 15min → 25min.
+- **Bugfix Schichtleiter-Arbeitsplanung**: `loadHourBudgets` schlug still fehl → Schichtleiter sah keinen Fehler, Button blieb deaktiviert. Jetzt wird der Fehler sichtbar angezeigt (roter Hinweiskasten) und der Button zeigt klar warum er deaktiviert ist.
+- **Bugfix Schichtleiter-Arbeitsplanung**: Beim ersten Seitenaufruf direkt nach dem Docker-Start schlug `loadWorkPlans` fehl (Service noch nicht bereit). Jetzt automatischer Retry nach 5 Sekunden mit Statusmeldung.
+- **Seed-Stundenkontingent**: `user-role-service` legt beim Start automatisch ein Stundenkontingent für den laufenden Monat (160h) für `sl.huber` an — frische Umgebung ist sofort nutzbar ohne manuellen HR-Schritt.
+
+---
+
 ## Dokumentation
 
 | Dokument | Beschreibung |
