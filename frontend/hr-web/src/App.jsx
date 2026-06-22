@@ -7,6 +7,7 @@ import InvoicesPage from './pages/InvoicesPage';
 import HourBudgetsPage from './pages/HourBudgetsPage';
 import PayrollPage from './pages/PayrollPage';
 import AbsencesPage from './pages/AbsencesPage';
+import RapportsPage from './pages/RapportsPage';
 
 function ProtectedRoute({ children }) {
   const token = localStorage.getItem('token');
@@ -27,6 +28,7 @@ export default function App() {
           <Route path="/hour-budgets" element={<ProtectedRoute><HourBudgetsPage /></ProtectedRoute>} />
           <Route path="/payroll"   element={<ProtectedRoute><PayrollPage /></ProtectedRoute>} />
           <Route path="/absences"  element={<ProtectedRoute><AbsencesPage /></ProtectedRoute>} />
+          <Route path="/rapports"  element={<ProtectedRoute><RapportsPage /></ProtectedRoute>} />
           <Route path="/"          element={<Navigate to="/dashboard" replace />} />
         </Routes>
       </BrowserRouter>

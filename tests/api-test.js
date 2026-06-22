@@ -416,6 +416,32 @@ async function testConfigService() {
   }
 }
 
+async function testMediaService() {
+  section('Report / Media Service  (US-MA-Rapport)');
+
+  // HR und Admin dürfen Rapporte pro Mitarbeiter auflisten (auch leere Liste ist 200)
+  const { status: gm1, data: list1 } = await req('GET', '/api/media/employee/4', null, tokens['HR']);
+  check('GET /api/media/employee/4 – HR darf auflisten', gm1 === 200 && Array.isArray(list1), `HTTP ${gm1}`);
+
+  const { status: gm2, data: list2 } = await req('GET', '/api/media/employee/4', null, tokens['ADMIN']);
+  check('GET /api/media/employee/4 – Admin darf auflisten', gm2 === 200 && Array.isArray(list2), `HTTP ${gm2}`);
+
+  const { status: gm3, data: list3 } = await req('GET', '/api/media/employee/4', null, tokens['EMPLOYEE']);
+  check('GET /api/media/employee/4 – Employee darf eigene Rapporte sehen', gm3 === 200 && Array.isArray(list3), `HTTP ${gm3}`);
+
+  // Kein Token → 401
+  const { status: gm4 } = await req('GET', '/api/media/employee/4', null, null);
+  check('GET /api/media/employee/4 – kein Token → 401', gm4 === 401, `HTTP ${gm4}`);
+
+  // Unbekannte ID → 404
+  const { status: gm5 } = await req('GET', '/api/media/nonexistent-rapport-id-ci', null, tokens['HR']);
+  check('GET /api/media/:id – unbekannte ID → 404', gm5 === 404, `HTTP ${gm5}`);
+
+  // Rapporte pro Auftrag auflisten (leere Liste = 200)
+  const { status: gm6, data: list4 } = await req('GET', '/api/media/order/1', null, tokens['HR']);
+  check('GET /api/media/order/1 – HR darf auflisten', gm6 === 200 && Array.isArray(list4), `HTTP ${gm6}`);
+}
+
 // ── Main ──────────────────────────────────────────────────────
 
 async function run() {
@@ -434,6 +460,7 @@ async function run() {
   await testBillingService();
   await testTimeService();
   await testConfigService();
+  await testMediaService();
   await cleanupTestData();
 
   const total = passed + failed;

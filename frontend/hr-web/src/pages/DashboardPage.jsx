@@ -7,6 +7,7 @@ const CARDS = [
   { to: '/invoices', mark: 'CHF',  title: 'Rechnungen',         desc: 'Rechnungen erstellen, versenden und abrechnen' },
   { to: '/payroll',  mark: 'Lohn', title: 'Lohnauszüge',       desc: 'Monatslohn aus Stunden, Rate, Zuschlägen und Abzügen berechnen' },
   { to: '/absences', mark: 'Abw',  title: 'Absenzen & Ferien',  desc: 'Anträge prüfen und genehmigen' },
+  { to: '/rapports', mark: 'Foto', title: 'Rapport-Bilder',      desc: 'Vom Mitarbeiter hochgeladene Rapportfotos einsehen' },
 ];
 
 export default function DashboardPage() {
