@@ -49,17 +49,202 @@ Klasse: Modul 335
 
 ## Änderungshistorie
 
-### 2026-06-22
-- **Docker Compose Startup-Reihenfolge**: Alle Spring-Boot-Services warten nun via `condition: service_healthy` auf MySQL/MongoDB, bevor sie starten. `nc`-basierte Health-Checks wurden wegen BusyBox-Inkompatibilität (SIGALRM Exit-Code) entfernt; stattdessen `service_started` als Abhängigkeitsbedingung für den API-Gateway.
-- **CI-Timeouts erhöht**: Seed-User-Warteschritt 120s → 150s, API-Gateway-Warte-Timeout 90s → 150s, Job-Timeout 15min → 25min.
-- **Bugfix Schichtleiter-Arbeitsplanung**: `loadHourBudgets` schlug still fehl → Schichtleiter sah keinen Fehler, Button blieb deaktiviert. Jetzt wird der Fehler sichtbar angezeigt (roter Hinweiskasten) und der Button zeigt klar warum er deaktiviert ist.
-- **Bugfix Schichtleiter-Arbeitsplanung**: Beim ersten Seitenaufruf direkt nach dem Docker-Start schlug `loadWorkPlans` fehl (Service noch nicht bereit). Jetzt automatischer Retry nach 5 Sekunden mit Statusmeldung.
-- **Seed-Stundenkontingent**: `user-role-service` legt beim Start automatisch ein Stundenkontingent für den laufenden Monat (160h) für `sl.huber` an — frische Umgebung ist sofort nutzbar ohne manuellen HR-Schritt.
-- **Bugfix HR-Stundenfreigabe**: Seite zeigte "Stundenfreigaben konnten nicht geladen werden" wenn planning-service oder user-role-service beim Seitenaufruf noch initialisierte. `Promise.all` wurde durch `Promise.allSettled` ersetzt (Teilfehler blockieren nicht mehr die ganze Seite) + Auto-Retry nach 5 Sekunden.
-- **Bugfix CORS-Doppelheader im Planning Service**: HR-Stundenfreigabe-Seite und Schichtleiter-Arbeitsplanung lieferten einen doppelten `Access-Control-Allow-Origin`-Header → Browser blockierte alle Requests an `/api/planning/**` mit CORS-Fehler. Ursache: der Planning Service setzte den Header auf zwei Wegen gleichzeitig (1) eigene `corsConfigurationSource`-Bean in `SecurityConfig` und (2) `@CrossOrigin`-Annotation direkt auf dem Controller. Alle anderen Services verwenden korrekt `cors.disable()`, da CORS ausschliesslich vom API Gateway zentral verwaltet wird. Fix: `corsConfigurationSource`-Bean und Import entfernt, `cors.disable()` eingesetzt; `@CrossOrigin`-Annotation und zugehörigen Import aus `PlanningController` entfernt. Zwei Regressionstests in `PlanningControllerTests` stellen sicher, dass der Service künftig keinen CORS-Header direkt setzt.
-- **Neue Seite HR-Web: Rapport-Bilder** (`/rapports`): HR kann hochgeladene Rapportfotos der Mitarbeiter einsehen. Mitarbeiter aus Dropdown wählen → Liste aller Uploads erscheint (Datum, Auftrags-ID, Notiz, Dateigrösse) → Bild wird per Klick lazy via `GET /api/media/{id}` mit JWT-Auth durch den API Gateway geladen und inline angezeigt. Bilder werden als Blob-URLs im Browser gecacht und beim Verlassen der Seite freigegeben. 6 neue API-Tests für den Media Service in `api-test.js` (Listing, Auth, 404); `report-media-service` neu im Maven-Test-Job der CI.
-- **Screenshot-Dokumentation**: 11 Screenshots von allen Frontends und der Mobile App in `docs/screenshots/` abgelegt; Vorschau-Abschnitt oben im README mit Erklärungen zu jedem Screen ergänzt. MongoDB-Nachweis des Bild-Uploads ebenfalls dokumentiert.
-- **Bugfix Bild-Upload Mobile App (Report/Media Service)**: Upload von Kamerabildern schlug aus drei Gründen fehl: (1) Spring Cloud Gateway hat ein Standard-In-Memory-Buffer-Limit von 256 KB — Kamerabilder sind typischerweise 2–6 MB und wurden deshalb vom Gateway mit einem Fehler abgebrochen, bevor sie den Report-Service überhaupt erreichten. Fix: `spring.codec.max-in-memory-size: 10MB` in `api-gateway/application.yml`. (2) Flutter sendete den Content-Type der Bilddatei nicht explizit mit → bei temporären Dateipfaden ohne Endung erkannte die `http`-Library den Typ nicht und sendete `application/octet-stream`, was der Service korrekt ablehnte. Fix: Content-Type wird jetzt anhand der Dateiendung explizit auf `image/jpeg` oder `image/png` gesetzt (`http_parser`-Package). (3) Der globale Request-Timeout von 8 Sekunden gilt auch für den Upload — für grössere Bilder oder langsamere Verbindungen zu knapp. Fix: separater `uploadTimeout` von 30 Sekunden in `ApiConfig`. Zusätzlich: `report-media-service/SecurityConfig` fehlte als einziger Service ein `authenticationEntryPoint` → gab bei fehlendem Token 403 statt 401 zurück. Fix: `authenticationEntryPoint` ergänzt, Verhalten nun konsistent mit allen anderen Services. 7 neue Tests in `MediaControllerTests` (Upload JPEG, Upload PNG, kein Token → 401, falscher Typ → 400, unbekannte ID → 404, listByEmployee, Upload mit Auftrags-ID).
+### 2026-06-22 — Debugging-Session & neue Seite: Rapport-Bilder
+
+#### Übersicht
+
+| Bereich | Typ | Kurzbeschreibung |
+|---|---|---|
+| Planning Service | Bugfix | CORS-Doppelheader behoben |
+| HR-Web | Bugfix | Stundenfreigabe mit `Promise.allSettled` stabilisiert |
+| SL-Web | Bugfix | Arbeitsplanung: Silent-Fehler sichtbar + Auto-Retry |
+| Mobile App | Bugfix | Bild-Upload: Gateway-Buffer, Content-Type, Timeout |
+| Report-Media Service | Bugfix | `authenticationEntryPoint` → 401 statt 403 |
+| HR-Web | Feature | Neue Seite `/rapports` mit Lazy-Image-Loading |
+| Docker / CI | Stabilität | Health-Checks und Timeouts angepasst |
+| Dokumentation | Docs | 11 Screenshots, Vorschau-Galerie, Flutter-Anleitung |
+
+---
+
+#### 1. Bugfix: CORS-Doppelheader im Planning Service
+
+**Problem**: HR-Stundenfreigabe und SL-Arbeitsplanung lieferten einen doppelten `Access-Control-Allow-Origin`-Header — der Browser blockierte daraufhin alle Requests an `/api/planning/**`.
+
+**Ursache**: Der Planning Service setzte den CORS-Header auf zwei Wegen gleichzeitig:
+1. Eigene `corsConfigurationSource`-Bean in `SecurityConfig`
+2. `@CrossOrigin`-Annotation direkt auf dem Controller
+
+Im System gilt: **CORS wird ausschliesslich vom API Gateway verwaltet** — alle anderen Services müssen `cors.disable()` setzen.
+
+```mermaid
+graph LR
+    Browser -->|"preflight / request"| GW
+
+    subgraph GW["API Gateway :8000\n(einzige CORS-Quelle)"]
+        CORS["Access-Control-Allow-Origin\nAccess-Control-Allow-Methods\nAccess-Control-Allow-Headers"]
+    end
+
+    GW --> PL["Planning Service\nvorher: cors.disable() FEHLT ❌\nnachher: cors.disable() ✅"]
+    GW --> AU["Auth Service\ncors.disable() ✅"]
+    GW --> US["User-Role Service\ncors.disable() ✅"]
+    GW --> AB["Absence Service\ncors.disable() ✅"]
+    GW --> RM["Report-Media Service\ncors.disable() ✅"]
+
+    style GW fill:#bbf7d0,stroke:#15803d,color:#14532d
+    style PL fill:#fecaca,stroke:#dc2626,color:#7f1d1d
+```
+
+**Fix**:
+- `corsConfigurationSource`-Bean + Import aus `SecurityConfig.java` entfernt, `cors.disable()` eingesetzt
+- `@CrossOrigin`-Annotation + Import aus `PlanningController.java` entfernt
+- 2 Regressionstests in `PlanningControllerTests` sichern, dass der Service keinen CORS-Header direkt setzt
+
+---
+
+#### 2. Bugfix: Bild-Upload Mobile App
+
+**Problem**: Upload von Kamerabildern schlug aus 3 unabhängigen Gründen fehl.
+
+```mermaid
+sequenceDiagram
+    actor App as Flutter App
+    participant GW as API Gateway :8000
+    participant RS as Report-Media Service
+    participant DB as MongoDB
+
+    rect rgb(254,202,202)
+        Note over App,DB: VORHER — 3 parallele Fehlerquellen
+        App->>GW: POST /api/media/upload (Kamerabild ~4 MB)
+        Note over GW: ❌ 256 KB In-Memory-Limit → bricht ab
+        Note over App: ❌ Content-Type: application/octet-stream<br/>(kein Datei-Extension → Auto-detect schlägt fehl)
+        Note over App: ❌ Timeout: 8 s (globaler Request-Timeout)
+    end
+
+    rect rgb(187,247,208)
+        Note over App,DB: NACHHER — alle 3 Ursachen behoben
+        App->>GW: POST /api/media/upload<br/>Content-Type: image/jpeg ✅  Timeout: 30 s ✅
+        Note over GW: max-in-memory-size: 10 MB ✅
+        GW->>RS: weiterleiten
+        RS->>DB: Bild binär speichern
+        RS-->>App: 201 Created ✅
+    end
+```
+
+**Fixes im Detail**:
+
+| # | Problem | Datei | Änderung |
+|---|---|---|---|
+| 1 | Gateway bricht Upload bei > 256 KB ab | `api-gateway/application.yml` | `spring.codec.max-in-memory-size: 10MB` |
+| 2 | Auto-detect Content-Type schlägt bei temp. Pfaden fehl | `mobile/lib/services/api_service.dart` | Explizit `image/jpeg` / `image/png` via `http_parser` |
+| 3 | Globaler 8s-Timeout zu knapp für grosse Bilder | `mobile/lib/services/api_config.dart` | Separater `uploadTimeout: 30s` |
+| 4 | Kein Token → 403 statt 401 (kein `authenticationEntryPoint`) | `report-media-service/.../SecurityConfig.java` | `authenticationEntryPoint` ergänzt |
+
+---
+
+#### 3. Bugfix: Race Condition bei HR-Stundenfreigabe & SL-Arbeitsplanung
+
+**Problem**: Seiten zeigten Fehler oder deaktivierte Buttons, wenn Services beim ersten Seitenaufruf direkt nach dem Docker-Start noch nicht vollständig bereit waren.
+
+```mermaid
+graph TD
+    A[Seitenaufruf direkt nach docker compose up] --> B{Services bereit?}
+    B -->|Nein| C_old["VORHER: Promise.all\n→ ein Fehler = alles leer\nButton bleibt deaktiviert\nkeine Erklärung"]
+    B -->|Nein| D_new["NACHHER: Promise.allSettled\n→ Teilfehler werden isoliert\nroter Hinweis sichtbar\nAuto-Retry nach 5 s"]
+    B -->|Ja| E[Seite lädt normal]
+    D_new -->|5 s später| B
+
+    style C_old fill:#fecaca,stroke:#dc2626,color:#7f1d1d
+    style D_new fill:#bbf7d0,stroke:#15803d,color:#14532d
+```
+
+---
+
+#### 4. Docker-Stabilität & CI
+
+**Docker Compose**:
+- Alle Spring-Boot-Services warten via `condition: service_healthy` auf MySQL / MongoDB
+- `nc`-basierte Health-Checks entfernt (BusyBox-Inkompatibilität: SIGALRM Exit-Code)
+- `user-role-service` seeded beim Start automatisch 160h Stundenkontingent für `sl.huber` → frische Umgebung sofort nutzbar
+
+**CI-Timeouts**:
+
+| Schritt | Vorher | Nachher |
+|---|---|---|
+| Seed-User-Warte | 120 s | 150 s |
+| API-Gateway-Warte | 90 s | 150 s |
+| Job-Timeout | 15 min | 25 min |
+
+---
+
+#### 5. Neue Seite: HR-Web Rapport-Bilder (`/rapports`)
+
+HR-Benutzer können Rapportfotos einsehen, die Mitarbeiter via Mobile App hochgeladen haben.
+
+```mermaid
+graph LR
+    subgraph Mobile["Mobile App (Flutter)"]
+        MA["Mitarbeiter\nfotografiert & lädt hoch"]
+    end
+
+    subgraph Backend["Backend"]
+        GW["API Gateway :8000"]
+        RS["Report-Media Service :8087"]
+        DB[("MongoDB\nmedia_reports")]
+    end
+
+    subgraph HRWeb["HR-Web (React)"]
+        DP["/rapports\nDropdown → Mitarbeiter wählen"]
+        IL["Lazy Image Load\n→ Blob URL"]
+        BW["Bild im Browser"]
+    end
+
+    MA -->|"POST /api/media/upload\nJWT + multipart"| GW
+    GW --> RS --> DB
+
+    DP -->|"GET /api/media/employee/{id}"| GW
+    GW --> RS --> DB --> RS --> GW --> IL
+    IL -->|"URL.createObjectURL()"| BW
+
+    style GW fill:#dbeafe,stroke:#1d4ed8,color:#1e3a8a
+    style DB fill:#fef9c3,stroke:#ca8a04,color:#713f12
+```
+
+**Details**:
+- Mitarbeiter-Dropdown: `GET /api/users?role=EMPLOYEE`
+- Rapport-Liste: `GET /api/media/employee/{id}` — zeigt Datum, Auftrags-ID, Notiz, Dateigrösse
+- Bilder werden **lazy** per Klick geladen: Axios `responseType: 'blob'` → `URL.createObjectURL()` (direkter `<img src>` geht nicht, da JWT-Header nötig)
+- Blob-URLs beim Seitenverlassen via `URL.revokeObjectURL()` freigegeben
+
+---
+
+#### 6. Tests & CI
+
+| Test-Datei | Neue Tests | Was wird geprüft |
+|---|---|---|
+| `PlanningControllerTests.java` | +2 | Service setzt keinen CORS-Header direkt |
+| `MediaControllerTests.java` | +7 | Upload JPEG/PNG, kein Token→401, falscher Typ→400, 404, listByEmployee, Upload mit Auftrags-ID |
+| `api-test.js` | +6 | Media: Listing HR/Admin/Employee, kein Token→401, 404, Order-List |
+| CI Maven `-pl` | +1 Service | `report-media-service` neu im Backend-Test-Job |
+
+---
+
+#### 7. Screenshot-Dokumentation
+
+11 Screenshots in `docs/screenshots/` — Vorschau-Galerie oben im README ergänzt.
+
+| Datei | Inhalt |
+|---|---|
+| `mobile_login.png` | Flutter Login-Screen |
+| `mobile_checkin.png` | Check-in / Check-out |
+| `mobile_kalender.png` | Kalenderansicht |
+| `mobile_absenzen.png` | Absenz einreichen |
+| `mobile_rapport.png` | Rapport mit Bild-Upload |
+| `mobile_noSQLupload.png` | MongoDB-Nachweis des Uploads |
+| `screenshot_admin_dashboard.png` | Admin-Dashboard |
+| `screenshot_hr_dashboard.png` | HR-Dashboard |
+| `screenshot_hr_stundenfreigabe.png` | HR Stundenfreigabe |
+| `screenshot_sl_planung.png` | Schichtleiter Arbeitsplanung |
+| `web_hr_rapports.png` | HR Rapport-Bilder Seite |
 
 ---
 
