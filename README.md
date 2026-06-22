@@ -1154,3 +1154,109 @@ feat(hr-web): implement invoice creation page
 ---
 
 *Viel Erfolg beim Ausarbeiten! Bei Fragen → Issue erstellen oder direkt im Kanban kommentieren.*
+
+---
+
+## 14. Nachträgliche Ergänzungen (Stand 2026-06-22)
+
+### Übersicht der Änderungen
+
+Folgende drei Punkte wurden nachträglich implementiert, um offene Lücken zu schliessen:
+
+1. **Config Service** – neuer Backend-Microservice für Firmenkonzepte, Stundenregeln und Lohnregeln (ersetzt localStorage im Admin-Web)
+2. **Admin-Web: Stundenübersicht vom Time Service** – Echtdaten statt Dummy-Daten
+3. **HR-Web: Abwesenheitskalender** – neuer Tab mit monatlicher Kalenderansicht
+
+---
+
+### 1. Config Service (`backend/config-service`, Port 8010)
+
+**Warum:** Das Admin-Web speicherte Firmenkonzepte, Stundenregeln und Lohnregeln bisher im `localStorage` des Browsers. Das hat mehrere Nachteile: Daten gehen beim Browser-Clear verloren, sind nicht teamweit geteilt und entsprechen nicht der Microservice-Architektur des restlichen Systems.
+
+**Was wurde gemacht:**
+
+- Neuer Spring Boot 3.3 Microservice `config-service` im Package `com.workforce.adminconfig`
+- **Standalone-Maven-Projekt** (eigene `spring-boot-starter-parent`-Elterndependenz), damit die bestehenden Dockerfiles der 10 anderen Services nicht angefasst werden mussten
+- Port **8010**, Container-Name `config-service`
+- Gleiche Sicherheitsarchitektur wie alle anderen Services: JWT-Auth-Filter, stateless, kein CORS (Gateway regelt das)
+- **Berechtigungen:** GET für ADMIN/HR/SHIFT_LEAD; POST/PUT/DELETE nur für ADMIN
+
+**Neue Datenbanktabellen** in `database/mysql/init.sql`:
+
+| Tabelle | Inhalt |
+|---|---|
+| `company_concepts` | Firmenkonzepte: Name, Beschreibung, aktiv/inaktiv |
+| `time_rules` | Stundenregeln: max. Tages-/Wochenstunden, Pausenregel |
+| `wage_rules` | Lohnregeln: Stundenansatz, Überstundenansatz, zugeordnetes Konzept |
+
+**API-Endpunkte:**
+
+```
+GET    /api/config/concepts         → alle Konzepte
+POST   /api/config/concepts         → Konzept erstellen (ADMIN)
+PUT    /api/config/concepts/{id}    → Konzept bearbeiten (ADMIN)
+
+GET    /api/config/time-rules       → alle Stundenregeln
+POST   /api/config/time-rules       → Stundenregel erstellen (ADMIN)
+PUT    /api/config/time-rules/{id}  → Stundenregel bearbeiten (ADMIN)
+
+GET    /api/config/wage-rules       → alle Lohnregeln
+POST   /api/config/wage-rules       → Lohnregel erstellen (ADMIN)
+PUT    /api/config/wage-rules/{id}  → Lohnregel bearbeiten (ADMIN)
+```
+
+**Geänderte Infrastruktur-Dateien:**
+- `backend/api-gateway/src/main/resources/application.yml` → neue Route `/api/config/**`
+- `docker-compose.yml` → `config-service`-Eintrag, in `api-gateway` depends_on ergänzt
+
+---
+
+### 2. Admin-Web: Stundenübersicht vom Time Service
+
+**Warum:** Der Admin konnte bisher nur Dummy-Daten aus dem `localStorage` sehen. Der Time Service (`:8005`) liefert die echten Check-in/Check-out-Einträge aller Mitarbeiter.
+
+**Was wurde gemacht** in `frontend/admin-web/src/pages/DashboardPage.jsx`:
+
+- Neue State-Variablen: `apiTimeTotal`, `apiBreakViolations`, `timeFrom`, `timeTo`
+- Neue Funktion `loadTimeTotal(from, to)` → ruft `GET /api/time/total` und `GET /api/time/break-violations` parallel auf
+- Im Tab **"Lohn und Stunden"**: Stundenübersicht zeigt jetzt echte Gesamtstunden pro Mitarbeiter und Pausenverstösse aus dem Time Service
+- Datumsfilter (Von/Bis) mit Laden-Button – gleiche UX wie auf der HR-Seite
+
+---
+
+### 3. HR-Web: Abwesenheitskalender
+
+**Warum:** In der HR-Web-Applikation gab es zwar eine Absenz-Verwaltungsseite (Genehmigen, Ablehnen, Erstellen), aber keine übersichtliche kalendarische Darstellung aller Absenzen.
+
+**Was wurde gemacht** in `frontend/hr-web/src/pages/AbsencesPage.jsx`:
+
+- Neuer Tab **"Kalender"** neben den bestehenden Tabs "Ausstehende Anträge" und "Alle Absenzen"
+- Monatliche Rasteransicht (Mo–So, ISO-Wochenstart)
+- Farbkodierung nach Absenztyp:
+  - **Ferien** → blau (`#dbeafe` / `#1e40af`)
+  - **Krankheit** → rot (`#fee2e2` / `#991b1b`)
+  - **Sonstiges** → grau (`#f3f4f6` / `#4b5563`)
+- Vor-/Zurück-Navigation zwischen Monaten, Heute-Markierung
+- Lädt alle Absenzen via `GET /api/absences`; das Raster filtert lokal auf den sichtbaren Monat
+
+---
+
+### Ports-Übersicht (vollständig)
+
+| Port | Service |
+|---|---|
+| 8000 | API Gateway |
+| 8001 | Auth Service |
+| 8002 | User & Role Service |
+| 8003 | Order Service |
+| 8004 | Planning Service |
+| 8005 | Time Service |
+| 8006 | Absence & Vacation Service |
+| 8007 | Billing Service |
+| 8008 | Report/Media Service |
+| 8009 | Flipper Auth Service |
+| **8010** | **Config Service (neu)** |
+| 3001 | Admin Web |
+| 3002 | HR Web |
+| 3003 | Schichtleiter Web |
+| 3004 | Flipper Auth Web |

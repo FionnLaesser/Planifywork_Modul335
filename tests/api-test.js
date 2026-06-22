@@ -353,6 +353,69 @@ async function cleanupTestData() {
   }
 }
 
+async function testConfigService() {
+  section('Config Service  (Firmenkonzepte / Stundenregeln / Lohnregeln)');
+
+  // ── Konzepte ─────────────────────────────────────────────────
+  const { status: gc1, data: concepts } = await req('GET', '/api/config/concepts', null, tokens['ADMIN']);
+  check('GET /api/config/concepts – Admin darf lesen', gc1 === 200 && Array.isArray(concepts), `HTTP ${gc1}`);
+
+  const { status: gc2 } = await req('GET', '/api/config/concepts', null, tokens['HR']);
+  check('GET /api/config/concepts – HR darf lesen', gc2 === 200, `HTTP ${gc2}`);
+
+  const { status: gc3 } = await req('GET', '/api/config/concepts', null, tokens['SHIFT_LEAD']);
+  check('GET /api/config/concepts – SHIFT_LEAD darf lesen', gc3 === 200, `HTTP ${gc3}`);
+
+  const { status: pc1, data: newConcept } = await req('POST', '/api/config/concepts',
+    { name: 'Test-Konzept CI', description: 'Automatisch erstellt', active: true },
+    tokens['ADMIN']);
+  check('POST /api/config/concepts – Admin darf erstellen', pc1 === 201, `HTTP ${pc1}`);
+
+  if (newConcept?.id) {
+    const { status: pu1, data: updated } = await req('PUT', `/api/config/concepts/${newConcept.id}`,
+      { name: 'Test-Konzept CI (aktualisiert)', active: false },
+      tokens['ADMIN']);
+    check('PUT /api/config/concepts/:id – Admin darf bearbeiten', pu1 === 200 && updated?.active === false, `HTTP ${pu1}`);
+  }
+
+  const { status: pc2 } = await req('POST', '/api/config/concepts',
+    { name: 'Sollte fehlschlagen', active: true },
+    tokens['HR']);
+  check('POST /api/config/concepts – HR darf NICHT erstellen (403)', pc2 === 403, `HTTP ${pc2}`);
+
+  // ── Stundenregeln ─────────────────────────────────────────────
+  const { status: gt1, data: timeRules } = await req('GET', '/api/config/time-rules', null, tokens['ADMIN']);
+  check('GET /api/config/time-rules – Admin darf lesen', gt1 === 200 && Array.isArray(timeRules), `HTTP ${gt1}`);
+
+  const { status: pt1, data: newTimeRule } = await req('POST', '/api/config/time-rules',
+    { name: 'CI-Stundenregel', maxDailyHours: 8.5, maxWeeklyHours: 42, breakAfterHours: 6, breakDurationMinutes: 30, active: true },
+    tokens['ADMIN']);
+  check('POST /api/config/time-rules – Admin darf erstellen', pt1 === 201, `HTTP ${pt1}`);
+
+  if (newTimeRule?.id) {
+    const { status: put1 } = await req('PUT', `/api/config/time-rules/${newTimeRule.id}`,
+      { name: 'CI-Stundenregel (aktualisiert)', active: false },
+      tokens['ADMIN']);
+    check('PUT /api/config/time-rules/:id – Admin darf bearbeiten', put1 === 200, `HTTP ${put1}`);
+  }
+
+  // ── Lohnregeln ────────────────────────────────────────────────
+  const { status: gw1, data: wageRules } = await req('GET', '/api/config/wage-rules', null, tokens['ADMIN']);
+  check('GET /api/config/wage-rules – Admin darf lesen', gw1 === 200 && Array.isArray(wageRules), `HTTP ${gw1}`);
+
+  const { status: pw1, data: newWageRule } = await req('POST', '/api/config/wage-rules',
+    { name: 'CI-Lohnregel', hourlyRate: 28.5, overtimeRate: 42.75, active: true },
+    tokens['ADMIN']);
+  check('POST /api/config/wage-rules – Admin darf erstellen', pw1 === 201, `HTTP ${pw1}`);
+
+  if (newWageRule?.id) {
+    const { status: pwu1 } = await req('PUT', `/api/config/wage-rules/${newWageRule.id}`,
+      { hourlyRate: 30.0, active: true },
+      tokens['ADMIN']);
+    check('PUT /api/config/wage-rules/:id – Admin darf bearbeiten', pwu1 === 200, `HTTP ${pwu1}`);
+  }
+}
+
 // ── Main ──────────────────────────────────────────────────────
 
 async function run() {
@@ -370,6 +433,7 @@ async function run() {
   await testAbsenceService();
   await testBillingService();
   await testTimeService();
+  await testConfigService();
   await cleanupTestData();
 
   const total = passed + failed;

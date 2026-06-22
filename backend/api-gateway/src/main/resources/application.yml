@@ -70,5 +70,10 @@ spring:
           predicates:
             - Path=/api/flipper-auth/**
 
+        - id: config-service
+          uri: http://config-service:8010
+          predicates:
+            - Path=/api/config/**
+
 jwt:
   secret: workforce-super-secret-jwt-key-change-in-production-min-256-bits

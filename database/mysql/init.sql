@@ -199,6 +199,41 @@ CREATE TABLE payroll_statements (
     FOREIGN KEY (created_by)  REFERENCES users(id)
 );
 
+-- ── Config Service ───────────────────────────────────────────────────────────
+
+CREATE TABLE company_concepts (
+    id          BIGINT AUTO_INCREMENT PRIMARY KEY,
+    name        VARCHAR(200) NOT NULL,
+    description TEXT,
+    active      BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at  DATETIME,
+    updated_at  DATETIME
+);
+
+CREATE TABLE time_rules (
+    id                   BIGINT AUTO_INCREMENT PRIMARY KEY,
+    name                 VARCHAR(200) NOT NULL,
+    max_daily_hours      DECIMAL(5,2),
+    max_weekly_hours     DECIMAL(5,2),
+    break_after_hours    DECIMAL(5,2),
+    break_duration_minutes INT,
+    active               BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at           DATETIME,
+    updated_at           DATETIME
+);
+
+CREATE TABLE wage_rules (
+    id             BIGINT AUTO_INCREMENT PRIMARY KEY,
+    name           VARCHAR(200) NOT NULL,
+    hourly_rate    DECIMAL(8,2) NOT NULL,
+    overtime_rate  DECIMAL(8,2),
+    concept_id     BIGINT,
+    active         BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at     DATETIME,
+    updated_at     DATETIME,
+    FOREIGN KEY (concept_id) REFERENCES company_concepts(id)
+);
+
 -- ── Seed: Roles ──────────────────────────────────────────────────────────────
 
 INSERT INTO roles (name) VALUES ('ADMIN'), ('HR'), ('SHIFT_LEAD'), ('EMPLOYEE');

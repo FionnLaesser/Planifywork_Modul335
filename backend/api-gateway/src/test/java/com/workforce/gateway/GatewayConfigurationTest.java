@@ -39,11 +39,11 @@ class GatewayConfigurationTest {
     // ── Routing-Tabelle ─────────────────────────────────────────────────────
 
     @Test
-    void allNineServiceRoutesAreDefined() {
+    void allTenServiceRoutesAreDefined() {
         List<?> routes = (List<?>) gatewayValue("spring", "cloud", "gateway", "routes");
         assertThat(routes)
-                .as("Gateway muss genau 9 Routen definieren (eine pro Backend-Service)")
-                .hasSize(9);
+                .as("Gateway muss genau 10 Routen definieren (eine pro Backend-Service)")
+                .hasSize(10);
     }
 
     @Test
@@ -57,6 +57,7 @@ class GatewayConfigurationTest {
         assertRoute("billing-service",          "http://billing-service:8007",          "Path=/api/billing/**");
         assertRoute("report-media-service",     "http://report-media-service:8008",     "Path=/api/media/**");
         assertRoute("flipper-auth-service",     "http://flipper-auth-service:8009",     "Path=/api/flipper-auth/**");
+        assertRoute("config-service",           "http://config-service:8010",           "Path=/api/config/**");
     }
 
     // ── CORS ────────────────────────────────────────────────────────────────
@@ -95,6 +96,7 @@ class GatewayConfigurationTest {
         assertJwtSecret("absence-vacation-service");
         assertJwtSecret("billing-service");
         assertJwtSecret("report-media-service");
+        assertJwtSecret("config-service");
     }
 
     // ── Service-Ports stimmen mit Gateway überein ───────────────────────────
@@ -109,6 +111,7 @@ class GatewayConfigurationTest {
         assertServicePort("absence-vacation-service", 8006);
         assertServicePort("billing-service",          8007);
         assertServicePort("report-media-service",     8008);
+        assertServicePort("config-service",           8010);
     }
 
     @Test
@@ -130,6 +133,7 @@ class GatewayConfigurationTest {
         assertDdlValidate("time-service");
         assertDdlValidate("absence-vacation-service");
         assertDdlValidate("billing-service");
+        assertDdlValidate("config-service");
     }
 
     @Test

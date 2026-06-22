@@ -94,6 +94,7 @@ services:
       - billing-service
       - report-media-service
       - flipper-auth-service
+      - config-service
     networks:
       - workforce-net
 
@@ -315,6 +316,27 @@ services:
     restart: "no"
     ports:
       - "3003:80"
+    networks:
+      - workforce-net
+
+  config-service:
+    build:
+      context: ./backend/config-service
+      dockerfile: Dockerfile
+    container_name: config-service
+    restart: "no"
+    ports:
+      - "8010:8010"
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      DB_HOST: mysql-db
+      DB_PORT: 3306
+      DB_NAME: workforce
+      SPRING_DATASOURCE_USERNAME: workforce
+      SPRING_DATASOURCE_PASSWORD: workforce
+    depends_on:
+      mysql-db:
+        condition: service_healthy
     networks:
       - workforce-net
 
