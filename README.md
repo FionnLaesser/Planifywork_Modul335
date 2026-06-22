@@ -13,6 +13,7 @@ Klasse: Modul 335
 - **Bugfix Schichtleiter-Arbeitsplanung**: `loadHourBudgets` schlug still fehl → Schichtleiter sah keinen Fehler, Button blieb deaktiviert. Jetzt wird der Fehler sichtbar angezeigt (roter Hinweiskasten) und der Button zeigt klar warum er deaktiviert ist.
 - **Bugfix Schichtleiter-Arbeitsplanung**: Beim ersten Seitenaufruf direkt nach dem Docker-Start schlug `loadWorkPlans` fehl (Service noch nicht bereit). Jetzt automatischer Retry nach 5 Sekunden mit Statusmeldung.
 - **Seed-Stundenkontingent**: `user-role-service` legt beim Start automatisch ein Stundenkontingent für den laufenden Monat (160h) für `sl.huber` an — frische Umgebung ist sofort nutzbar ohne manuellen HR-Schritt.
+- **Bugfix HR-Stundenfreigabe**: Seite zeigte "Stundenfreigaben konnten nicht geladen werden" wenn planning-service oder user-role-service beim Seitenaufruf noch initialisierte. `Promise.all` wurde durch `Promise.allSettled` ersetzt (Teilfehler blockieren nicht mehr die ganze Seite) + Auto-Retry nach 5 Sekunden.
 
 ---
 

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../services/api';
 
@@ -20,6 +20,7 @@ export default function HourBudgetsPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const retried = useRef(false);
 
   const shiftLeadNameById = useMemo(() => {
     const map = new Map();
@@ -27,25 +28,45 @@ export default function HourBudgetsPage() {
     return map;
   }, [shiftLeads]);
 
-  const loadData = async () => {
+  const loadData = async (isRetry = false) => {
     setLoading(true);
-    setError('');
-    try {
-      const [budgetsRes, leadsRes] = await Promise.all([
-        api.get('/api/planning/hour-budgets'),
-        api.get('/api/users', { params: { role: 'SHIFT_LEAD' } }),
-      ]);
-      setBudgets(budgetsRes.data || []);
-      const activeLeads = (leadsRes.data || []).filter(user => user.active);
+    if (!isRetry) setError('');
+
+    const [budgetsResult, leadsResult] = await Promise.allSettled([
+      api.get('/api/planning/hour-budgets'),
+      api.get('/api/users', { params: { role: 'SHIFT_LEAD' } }),
+    ]);
+
+    if (budgetsResult.status === 'fulfilled') {
+      setBudgets(budgetsResult.value.data || []);
+    }
+
+    if (leadsResult.status === 'fulfilled') {
+      const activeLeads = (leadsResult.value.data || []).filter(user => user.active);
       setShiftLeads(activeLeads);
       setForm(current => current.shiftLeadId || activeLeads.length === 0
         ? current
         : { ...current, shiftLeadId: String(activeLeads[0].id) });
-    } catch (err) {
-      setError(err.response?.data?.message || 'Stundenfreigaben konnten nicht geladen werden.');
-    } finally {
-      setLoading(false);
     }
+
+    const failed = budgetsResult.status === 'rejected' || leadsResult.status === 'rejected';
+    if (failed) {
+      const msg = budgetsResult.reason?.response?.data?.message
+        || leadsResult.reason?.response?.data?.message
+        || 'Daten konnten nicht geladen werden.';
+      if (!isRetry && !retried.current) {
+        retried.current = true;
+        setError(msg + ' Erneuter Versuch in 5 Sekunden…');
+        setTimeout(() => loadData(true), 5000);
+      } else {
+        setError(msg + ' Bitte "Aktualisieren" klicken.');
+      }
+    } else {
+      setError('');
+      retried.current = false;
+    }
+
+    setLoading(false);
   };
 
   useEffect(() => { loadData(); }, []);
@@ -127,7 +148,7 @@ export default function HourBudgetsPage() {
       <section style={{ ...panel, marginTop: 20 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
           <h3 style={{ margin: 0 }}>Bestehende Freigaben</h3>
-          <button onClick={loadData} disabled={loading} style={btnSecondary}>{loading ? 'Lädt…' : 'Aktualisieren'}</button>
+          <button onClick={() => { retried.current = false; loadData(); }} disabled={loading} style={btnSecondary}>{loading ? 'Lädt…' : 'Aktualisieren'}</button>
         </div>
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead>
