@@ -8,6 +8,7 @@ const defaultMonth = `${today.getFullYear()}-${String(today.getMonth() + 1).padS
 export default function TimePage() {
   const [employees, setEmployees] = useState([]);
   const [timeData, setTimeData] = useState([]);
+  const [breakViolations, setBreakViolations] = useState([]);
   const [detail, setDetail] = useState(null);
   const [detailEntries, setDetailEntries] = useState([]);
   const [month, setMonth] = useState(defaultMonth);
@@ -19,12 +20,17 @@ export default function TimePage() {
     setLoading(true);
     setError('');
     try {
-      const [empRes, timeRes] = await Promise.all([
+      const [year, selectedMonth] = month.split('-');
+      const from = `${year}-${selectedMonth}-01`;
+      const to = new Date(Number(year), Number(selectedMonth), 0).toISOString().slice(0, 10);
+      const [empRes, timeRes, violationRes] = await Promise.all([
         api.get('/api/users', { params: { role: 'EMPLOYEE' } }),
-        api.get('/api/time/total'),
+        api.get('/api/time/total', { params: { from, to } }),
+        api.get('/api/time/break-violations', { params: { from, to } }),
       ]);
       setEmployees((empRes.data || []).filter(e => e.active));
       setTimeData(timeRes.data || []);
+      setBreakViolations(violationRes.data || []);
     } catch (err) {
       setError(err.response?.status === 404
         ? 'Time Service noch nicht verfügbar. Sobald Mitarbeiter einchecken, erscheinen hier die Stunden.'
@@ -95,9 +101,45 @@ export default function TimePage() {
                 <span>erfasste Gesamtstunden</span>
               </div>
               <div className="metric-card">
-                <strong>{timeData.filter(t => !t.checkOut && t.checkIn).length}</strong>
-                <span>offene Einträge (kein Check-out)</span>
+                <strong>{breakViolations.length}</strong>
+                <span>Pausenverstösse</span>
               </div>
+            </div>
+
+
+            <div className="panel" style={{ marginBottom: 20 }}>
+              <div className="section-heading" style={{ marginBottom: 12 }}>
+                <h2 style={{ margin: 0 }}>Pausenverstösse</h2>
+                <span className="muted">Regel: &gt; 6h = 30 Min Pause, &gt; 9h = 45 Min Pause</span>
+              </div>
+              {breakViolations.length === 0 ? (
+                <div className="empty-state">Keine Pausenverstösse im gewählten Monat.</div>
+              ) : (
+                <div className="table-wrap">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Datum</th>
+                        <th>Mitarbeiter-ID</th>
+                        <th>Pause</th>
+                        <th>Erforderlich</th>
+                        <th>Hinweis</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {breakViolations.map(row => (
+                        <tr key={row.id}>
+                          <td>{row.entryDate}</td>
+                          <td>{row.employeeId}</td>
+                          <td>{row.breakMinutes ?? 0} min</td>
+                          <td><strong>{row.requiredBreakMinutes} min</strong></td>
+                          <td><span className="status warn">{row.message}</span></td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
 
             <div className="table-wrap">
@@ -159,6 +201,7 @@ export default function TimePage() {
                       <th>Datum</th>
                       <th>Check-in</th>
                       <th>Check-out</th>
+                      <th>Pause</th>
                       <th>Stunden</th>
                       <th>Status</th>
                     </tr>
@@ -171,6 +214,7 @@ export default function TimePage() {
                           <td>{entry.entryDate ?? entry.date ?? '—'}</td>
                           <td>{entry.checkIn ? entry.checkIn.slice(0, 5) : '—'}</td>
                           <td>{entry.checkOut ? entry.checkOut.slice(0, 5) : <span className="status warn">Offen</span>}</td>
+                          <td>{entry.breakMinutes ?? 0} min</td>
                           <td><strong>{Number(entry.totalHours || 0).toFixed(2)} h</strong></td>
                           <td>
                             <span className={`status ${open ? 'warn' : 'ok'}`}>

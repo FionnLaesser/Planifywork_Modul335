@@ -58,30 +58,24 @@ const emptyHr = {
 const emptyConcept = {
   name: '',
   description: '',
-  breakRule: '',
-  reportRequired: true,
-  timeRuleId: '',
-  wageRuleId: '',
-  status: 'aktiv',
+  active: true,
 };
 
 const emptyTimeRule = {
   name: '',
-  targetHours: 8,
-  breakMinutes: 30,
-  overtimeRule: '',
-  conceptId: '',
-  status: 'aktiv',
+  maxDailyHours: 8,
+  maxWeeklyHours: 40,
+  breakAfterHours: 6,
+  breakDurationMinutes: 30,
+  active: true,
 };
 
 const emptyWageRule = {
   name: '',
   hourlyRate: 28,
-  bonus: 0,
-  validFrom: '',
-  validTo: '',
-  assignment: '',
-  status: 'aktiv',
+  overtimeRate: 42,
+  conceptId: '',
+  active: true,
 };
 
 const emptyEmployee = {
@@ -285,6 +279,14 @@ export default function DashboardPage() {
   const [timeRuleForm, setTimeRuleForm] = useState(emptyTimeRule);
   const [wageRuleForm, setWageRuleForm] = useState(emptyWageRule);
   const [employeeForm, setEmployeeForm] = useState(emptyEmployee);
+  const [apiConcepts, setApiConcepts] = useState([]);
+  const [apiTimeRules, setApiTimeRules] = useState([]);
+  const [apiWageRules, setApiWageRules] = useState([]);
+  const today = new Date();
+  const [timeFrom, setTimeFrom] = useState(new Date(today.getFullYear(), today.getMonth(), 1).toISOString().slice(0, 10));
+  const [timeTo, setTimeTo] = useState(today.toISOString().slice(0, 10));
+  const [apiTimeTotal, setApiTimeTotal] = useState([]);
+  const [apiBreakViolations, setApiBreakViolations] = useState([]);
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
@@ -338,11 +340,53 @@ export default function DashboardPage() {
     }
   };
 
+  const fetchApiConcepts = async () => {
+    try {
+      const { data } = await api.get('/api/config/concepts');
+      setApiConcepts(data);
+    } catch {
+      showMessage('error', 'Firmenkonzepte konnten nicht geladen werden.');
+    }
+  };
+
+  const fetchApiTimeRules = async () => {
+    try {
+      const { data } = await api.get('/api/config/time-rules');
+      setApiTimeRules(data);
+    } catch {
+      showMessage('error', 'Stundenregeln konnten nicht geladen werden.');
+    }
+  };
+
+  const fetchApiWageRules = async () => {
+    try {
+      const { data } = await api.get('/api/config/wage-rules');
+      setApiWageRules(data);
+    } catch {
+      showMessage('error', 'Lohnregeln konnten nicht geladen werden.');
+    }
+  };
+
+  const loadTimeTotal = async (from, to) => {
+    try {
+      const [totalRes, violationRes] = await Promise.all([
+        api.get('/api/time/total', { params: { from, to } }),
+        api.get('/api/time/break-violations', { params: { from, to } }),
+      ]);
+      setApiTimeTotal(totalRes.data || []);
+      setApiBreakViolations(violationRes.data || []);
+    } catch {
+      showMessage('error', 'Stundenübersicht konnte nicht geladen werden.');
+    }
+  };
+
   useEffect(() => {
     if (active === 'roles')     fetchApiUsers();
     if (active === 'employees') fetchApiEmployees();
     if (active === 'hr')        fetchApiHrUsers();
     if (active === 'orders')    { fetchApiOrders(); fetchApiShiftLeads(); }
+    if (active === 'concepts')  { fetchApiConcepts(); fetchApiTimeRules(); fetchApiWageRules(); }
+    if (active === 'salary')    { fetchApiTimeRules(); fetchApiWageRules(); fetchApiConcepts(); loadTimeTotal(timeFrom, timeTo); }
   }, [active]);
 
   useEffect(() => {
@@ -350,6 +394,9 @@ export default function DashboardPage() {
     fetchApiEmployees();
     fetchApiOrders();
     fetchApiShiftLeads();
+    fetchApiConcepts();
+    fetchApiTimeRules();
+    fetchApiWageRules();
   }, []);
 
   const notices = useMemo(() => buildNotices(state), [state]);
@@ -364,7 +411,7 @@ export default function DashboardPage() {
     openAbsences: state.absences.filter(absence => absence.status === 'offen').length,
   }), [state, apiEmployees, orders]);
 
-  const conceptOptions = state.concepts.map(concept => ({ value: concept.id, label: concept.name }));
+  const conceptOptions = apiConcepts.map(concept => ({ value: concept.id, label: concept.name }));
 
   const setFilter = (key, value) => setFilters(current => ({ ...current, [key]: value }));
 
@@ -513,87 +560,89 @@ export default function DashboardPage() {
     setActive('hr');
   };
 
-  const saveConcept = event => {
+  const saveConcept = async event => {
     event.preventDefault();
-    if (!requireValues(conceptForm, [['name', 'Name'], ['description', 'Beschreibung'], ['breakRule', 'Pausenregel']])) return;
-    const id = editing.conceptId || makeId('concept');
-    commitChange(next => {
-      const payload = { ...conceptForm, id };
-      const index = next.concepts.findIndex(concept => concept.id === id);
-      if (index >= 0) next.concepts[index] = payload;
-      else next.concepts.unshift(payload);
-    }, {
-      area: 'Firmenkonzepte',
-      action: editing.conceptId ? 'Aktualisiert' : 'Erstellt',
-      record: conceptForm.name,
-      detail: conceptForm.description,
-    });
-    setConceptForm(emptyConcept);
-    setEditing(current => ({ ...current, conceptId: null }));
-    showMessage('success', 'Firmenkonzept gespeichert und für Aufträge nutzbar.');
+    if (!requireValues(conceptForm, [['name', 'Name']])) return;
+    const payload = {
+      name: conceptForm.name,
+      description: conceptForm.description,
+      active: conceptForm.active,
+    };
+    try {
+      if (editing.conceptId) {
+        await api.put(`/api/config/concepts/${editing.conceptId}`, payload);
+        showMessage('success', 'Firmenkonzept aktualisiert.');
+      } else {
+        await api.post('/api/config/concepts', payload);
+        showMessage('success', 'Firmenkonzept erstellt und für Aufträge nutzbar.');
+      }
+      setConceptForm(emptyConcept);
+      setEditing(current => ({ ...current, conceptId: null }));
+      await fetchApiConcepts();
+    } catch (err) {
+      const msg = err.response?.data?.error || 'Fehler beim Speichern des Konzepts.';
+      showMessage('error', String(msg));
+    }
   };
 
   const editConcept = concept => {
-    setConceptForm({ ...emptyConcept, ...concept });
+    setConceptForm({ name: concept.name, description: concept.description || '', active: concept.active });
     setEditing(current => ({ ...current, conceptId: concept.id }));
   };
 
-  const saveTimeRule = event => {
+  const saveTimeRule = async event => {
     event.preventDefault();
-    if (!requireValues(timeRuleForm, [['name', 'Name'], ['overtimeRule', 'Überstundenregel']])) return;
-    if (Number(timeRuleForm.targetHours) <= 0 || Number(timeRuleForm.breakMinutes) < 0) {
-      showMessage('error', 'Stunden- und Pausenwerte müssen gültig sein.');
-      return;
+    if (!requireValues(timeRuleForm, [['name', 'Name']])) return;
+    const payload = {
+      name: timeRuleForm.name,
+      maxDailyHours: Number(timeRuleForm.maxDailyHours) || null,
+      maxWeeklyHours: Number(timeRuleForm.maxWeeklyHours) || null,
+      breakAfterHours: Number(timeRuleForm.breakAfterHours) || null,
+      breakDurationMinutes: Number(timeRuleForm.breakDurationMinutes) || null,
+      active: timeRuleForm.active,
+    };
+    try {
+      if (editing.timeRuleId) {
+        await api.put(`/api/config/time-rules/${editing.timeRuleId}`, payload);
+        showMessage('success', 'Stundenregel aktualisiert.');
+      } else {
+        await api.post('/api/config/time-rules', payload);
+        showMessage('success', 'Stundenregel gespeichert.');
+      }
+      setTimeRuleForm(emptyTimeRule);
+      setEditing(current => ({ ...current, timeRuleId: null }));
+      await fetchApiTimeRules();
+    } catch (err) {
+      const msg = err.response?.data?.error || 'Fehler beim Speichern der Stundenregel.';
+      showMessage('error', String(msg));
     }
-    const id = editing.timeRuleId || makeId('time');
-    commitChange(next => {
-      const payload = {
-        ...timeRuleForm,
-        id,
-        targetHours: Number(timeRuleForm.targetHours),
-        breakMinutes: Number(timeRuleForm.breakMinutes),
-      };
-      const index = next.timeRules.findIndex(rule => rule.id === id);
-      if (index >= 0) next.timeRules[index] = payload;
-      else next.timeRules.unshift(payload);
-    }, {
-      area: 'Lohn und Stunden',
-      action: editing.timeRuleId ? 'Stundenregel aktualisiert' : 'Stundenregel erstellt',
-      record: timeRuleForm.name,
-      detail: `${timeRuleForm.targetHours} Sollstunden`,
-    });
-    setTimeRuleForm(emptyTimeRule);
-    setEditing(current => ({ ...current, timeRuleId: null }));
-    showMessage('success', 'Stundenregel gespeichert.');
   };
 
-  const saveWageRule = event => {
+  const saveWageRule = async event => {
     event.preventDefault();
-    if (!requireValues(wageRuleForm, [['name', 'Name'], ['validFrom', 'Gültig ab'], ['validTo', 'Gültig bis']])) return;
-    if (wageRuleForm.validFrom > wageRuleForm.validTo) {
-      showMessage('error', 'Der Gültigkeitszeitraum ist ungültig.');
-      return;
+    if (!requireValues(wageRuleForm, [['name', 'Name'], ['hourlyRate', 'Stundenansatz']])) return;
+    const payload = {
+      name: wageRuleForm.name,
+      hourlyRate: Number(wageRuleForm.hourlyRate),
+      overtimeRate: Number(wageRuleForm.overtimeRate) || null,
+      conceptId: wageRuleForm.conceptId ? Number(wageRuleForm.conceptId) : null,
+      active: wageRuleForm.active,
+    };
+    try {
+      if (editing.wageRuleId) {
+        await api.put(`/api/config/wage-rules/${editing.wageRuleId}`, payload);
+        showMessage('success', 'Lohnregel aktualisiert.');
+      } else {
+        await api.post('/api/config/wage-rules', payload);
+        showMessage('success', 'Lohnregel gespeichert.');
+      }
+      setWageRuleForm(emptyWageRule);
+      setEditing(current => ({ ...current, wageRuleId: null }));
+      await fetchApiWageRules();
+    } catch (err) {
+      const msg = err.response?.data?.error || 'Fehler beim Speichern der Lohnregel.';
+      showMessage('error', String(msg));
     }
-    const id = editing.wageRuleId || makeId('wage');
-    commitChange(next => {
-      const payload = {
-        ...wageRuleForm,
-        id,
-        hourlyRate: Number(wageRuleForm.hourlyRate),
-        bonus: Number(wageRuleForm.bonus),
-      };
-      const index = next.wageRules.findIndex(rule => rule.id === id);
-      if (index >= 0) next.wageRules[index] = payload;
-      else next.wageRules.unshift(payload);
-    }, {
-      area: 'Lohn und Stunden',
-      action: editing.wageRuleId ? 'Lohnregel aktualisiert' : 'Lohnregel erstellt',
-      record: wageRuleForm.name,
-      detail: `Ansatz CHF ${wageRuleForm.hourlyRate}`,
-    });
-    setWageRuleForm(emptyWageRule);
-    setEditing(current => ({ ...current, wageRuleId: null }));
-    showMessage('success', 'Lohnregel gespeichert.');
   };
 
   const saveEmployee = async event => {
@@ -702,15 +751,7 @@ export default function DashboardPage() {
     .filter(order => filters.orderStatus === 'alle' || order.status === filters.orderStatus)
     .filter(order => matchesSearch({
       ...order,
-      concept: findName(state.concepts, order.conceptId, ''),
-    }, search));
-
-  const filteredTimeEntries = state.timeEntries
-    .filter(entry => !filters.timePeriod || entry.date.startsWith(filters.timePeriod))
-    .filter(entry => matchesSearch({
-      ...entry,
-      employee: findName(state.employees, entry.employeeId, ''),
-      order: orders.find(order => String(order.id) === String(entry.orderId))?.title || '',
+      concept: findName(apiConcepts, order.conceptId, ''),
     }, search));
 
   const filteredAudit = state.auditLogs
@@ -739,7 +780,7 @@ export default function DashboardPage() {
         status: order.status,
         date: order.startDate,
         detail: `${order.company}, ${order.location}`,
-        evidence: findName(state.concepts, order.conceptId),
+        evidence: findName(apiConcepts, order.conceptId),
       })),
       Stunden: state.timeEntries.map(entry => ({
         id: entry.id,
@@ -968,7 +1009,7 @@ export default function DashboardPage() {
                           </select>
                         </td>
                         <td>{shiftLeadName(order.shiftLead, apiShiftLeads)}</td>
-                        <td>{findName(state.concepts, order.conceptId)}</td>
+                        <td>{findName(apiConcepts, order.conceptId)}</td>
                         <td><button className="secondary-button" type="button" onClick={() => editOrder(order)}>Bearbeiten</button></td>
                       </tr>
                     ))}
@@ -1051,36 +1092,17 @@ export default function DashboardPage() {
               <div className="section-heading">
                 <div>
                   <h2>Firmenkonzepte verwalten</h2>
-                  <p>Betriebliche Regeln für Aufträge, Mitarbeiter und Rapporte.</p>
+                  <p>Betriebliche Konzepte für Aufträge und Mitarbeiter – gespeichert im Config Service.</p>
                 </div>
               </div>
               <form className="panel" onSubmit={saveConcept}>
                 <h3>{editing.conceptId ? 'Konzept bearbeiten' : 'Konzept erstellen'}</h3>
                 <div className="form-grid">
                   <Field label="Name"><input value={conceptForm.name} onChange={event => setConceptForm({ ...conceptForm, name: event.target.value })} /></Field>
-                  <Field label="Pausenregel"><input value={conceptForm.breakRule} onChange={event => setConceptForm({ ...conceptForm, breakRule: event.target.value })} /></Field>
-                  <Field label="Stundenregel">
-                    <select value={conceptForm.timeRuleId} onChange={event => setConceptForm({ ...conceptForm, timeRuleId: event.target.value })}>
-                      <option value="">Nicht zugewiesen</option>
-                      {state.timeRules.map(rule => <option key={rule.id} value={rule.id}>{rule.name}</option>)}
-                    </select>
-                  </Field>
-                  <Field label="Lohnregel">
-                    <select value={conceptForm.wageRuleId} onChange={event => setConceptForm({ ...conceptForm, wageRuleId: event.target.value })}>
-                      <option value="">Nicht zugewiesen</option>
-                      {state.wageRules.map(rule => <option key={rule.id} value={rule.id}>{rule.name}</option>)}
-                    </select>
-                  </Field>
                   <Field label="Status">
-                    <select value={conceptForm.status} onChange={event => setConceptForm({ ...conceptForm, status: event.target.value })}>
+                    <select value={conceptForm.active ? 'aktiv' : 'inaktiv'} onChange={event => setConceptForm({ ...conceptForm, active: event.target.value === 'aktiv' })}>
                       <option value="aktiv">aktiv</option>
                       <option value="inaktiv">inaktiv</option>
-                    </select>
-                  </Field>
-                  <Field label="Rapport erforderlich">
-                    <select value={conceptForm.reportRequired ? 'ja' : 'nein'} onChange={event => setConceptForm({ ...conceptForm, reportRequired: event.target.value === 'ja' })}>
-                      <option value="ja">ja</option>
-                      <option value="nein">nein</option>
                     </select>
                   </Field>
                   <Field label="Beschreibung" full><textarea value={conceptForm.description} onChange={event => setConceptForm({ ...conceptForm, description: event.target.value })} /></Field>
@@ -1095,26 +1117,23 @@ export default function DashboardPage() {
                   <thead>
                     <tr>
                       <th>Name</th>
-                      <th>Regeln</th>
+                      <th>Beschreibung</th>
                       <th>Status</th>
-                      <th>Betroffene Bereiche</th>
                       <th>Aktion</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {state.concepts.filter(concept => matchesSearch(concept, search)).map(concept => {
-                      const affectedOrders = state.orders.filter(order => order.conceptId === concept.id).length;
-                      const affectedEmployees = state.employees.filter(employee => employee.conceptId === concept.id).length;
-                      return (
-                        <tr key={concept.id}>
-                          <td>{concept.name}<br /><span className="muted">{concept.description}</span></td>
-                          <td>{concept.breakRule}<br /><span className="muted">{concept.reportRequired ? 'Rapportpflicht' : 'Keine Rapportpflicht'}</span></td>
-                          <td><StatusBadge value={concept.status} /></td>
-                          <td>{affectedOrders} Aufträge, {affectedEmployees} Mitarbeiter</td>
-                          <td><button className="secondary-button" type="button" onClick={() => editConcept(concept)}>Bearbeiten</button></td>
-                        </tr>
-                      );
-                    })}
+                    {apiConcepts.length === 0 && (
+                      <tr><td colSpan={4} style={{ textAlign: 'center', color: '#888', padding: 18 }}>Keine Firmenkonzepte vorhanden</td></tr>
+                    )}
+                    {apiConcepts.filter(concept => matchesSearch(concept, search)).map(concept => (
+                      <tr key={concept.id}>
+                        <td>{concept.name}</td>
+                        <td><span className="muted">{concept.description || '—'}</span></td>
+                        <td><StatusBadge value={concept.active ? 'aktiv' : 'inaktiv'} /></td>
+                        <td><button className="secondary-button" type="button" onClick={() => editConcept(concept)}>Bearbeiten</button></td>
+                      </tr>
+                    ))}
                   </tbody>
                 </table>
               </div>
@@ -1126,40 +1145,52 @@ export default function DashboardPage() {
               <div className="section-heading">
                 <div>
                   <h2>Lohn und Stunden bestimmen</h2>
-                  <p>Regeln definieren und erfasste Stunden prüfen.</p>
+                  <p>Regeln definieren und erfasste Stunden prüfen – gespeichert im Config Service und Time Service.</p>
                 </div>
               </div>
               <div className="split-grid">
                 <form className="panel" onSubmit={saveTimeRule}>
-                  <h3>Stundenregel</h3>
+                  <h3>{editing.timeRuleId ? 'Stundenregel bearbeiten' : 'Stundenregel erstellen'}</h3>
                   <div className="form-grid">
                     <Field label="Name"><input value={timeRuleForm.name} onChange={event => setTimeRuleForm({ ...timeRuleForm, name: event.target.value })} /></Field>
-                    <Field label="Sollstunden"><input type="number" step="0.1" value={timeRuleForm.targetHours} onChange={event => setTimeRuleForm({ ...timeRuleForm, targetHours: event.target.value })} /></Field>
-                    <Field label="Pausenminuten"><input type="number" value={timeRuleForm.breakMinutes} onChange={event => setTimeRuleForm({ ...timeRuleForm, breakMinutes: event.target.value })} /></Field>
+                    <Field label="Max. Tagesstunden"><input type="number" step="0.5" value={timeRuleForm.maxDailyHours} onChange={event => setTimeRuleForm({ ...timeRuleForm, maxDailyHours: event.target.value })} /></Field>
+                    <Field label="Max. Wochenstunden"><input type="number" step="0.5" value={timeRuleForm.maxWeeklyHours} onChange={event => setTimeRuleForm({ ...timeRuleForm, maxWeeklyHours: event.target.value })} /></Field>
+                    <Field label="Pause nach (h)"><input type="number" step="0.5" value={timeRuleForm.breakAfterHours} onChange={event => setTimeRuleForm({ ...timeRuleForm, breakAfterHours: event.target.value })} /></Field>
+                    <Field label="Pausendauer (min)"><input type="number" value={timeRuleForm.breakDurationMinutes} onChange={event => setTimeRuleForm({ ...timeRuleForm, breakDurationMinutes: event.target.value })} /></Field>
+                    <Field label="Status">
+                      <select value={timeRuleForm.active ? 'aktiv' : 'inaktiv'} onChange={event => setTimeRuleForm({ ...timeRuleForm, active: event.target.value === 'aktiv' })}>
+                        <option value="aktiv">aktiv</option>
+                        <option value="inaktiv">inaktiv</option>
+                      </select>
+                    </Field>
+                  </div>
+                  <div className="actions" style={{ marginTop: 14 }}>
+                    <button className="primary-button" type="submit">Speichern</button>
+                    {editing.timeRuleId && <button className="ghost-button" type="button" onClick={() => { setTimeRuleForm(emptyTimeRule); setEditing(c => ({ ...c, timeRuleId: null })); }}>Abbrechen</button>}
+                  </div>
+                </form>
+                <form className="panel" onSubmit={saveWageRule}>
+                  <h3>{editing.wageRuleId ? 'Lohnregel bearbeiten' : 'Lohnregel erstellen'}</h3>
+                  <div className="form-grid">
+                    <Field label="Name"><input value={wageRuleForm.name} onChange={event => setWageRuleForm({ ...wageRuleForm, name: event.target.value })} /></Field>
+                    <Field label="Stundenansatz (CHF)"><input type="number" step="0.05" value={wageRuleForm.hourlyRate} onChange={event => setWageRuleForm({ ...wageRuleForm, hourlyRate: event.target.value })} /></Field>
+                    <Field label="Überstundenansatz (CHF)"><input type="number" step="0.05" value={wageRuleForm.overtimeRate} onChange={event => setWageRuleForm({ ...wageRuleForm, overtimeRate: event.target.value })} /></Field>
                     <Field label="Konzept">
-                      <select value={timeRuleForm.conceptId} onChange={event => setTimeRuleForm({ ...timeRuleForm, conceptId: event.target.value })}>
+                      <select value={wageRuleForm.conceptId} onChange={event => setWageRuleForm({ ...wageRuleForm, conceptId: event.target.value })}>
                         <option value="">Nicht zugewiesen</option>
                         {conceptOptions.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
                       </select>
                     </Field>
-                    <Field label="Überstundenregel" full><textarea value={timeRuleForm.overtimeRule} onChange={event => setTimeRuleForm({ ...timeRuleForm, overtimeRule: event.target.value })} /></Field>
+                    <Field label="Status">
+                      <select value={wageRuleForm.active ? 'aktiv' : 'inaktiv'} onChange={event => setWageRuleForm({ ...wageRuleForm, active: event.target.value === 'aktiv' })}>
+                        <option value="aktiv">aktiv</option>
+                        <option value="inaktiv">inaktiv</option>
+                      </select>
+                    </Field>
                   </div>
                   <div className="actions" style={{ marginTop: 14 }}>
                     <button className="primary-button" type="submit">Speichern</button>
-                  </div>
-                </form>
-                <form className="panel" onSubmit={saveWageRule}>
-                  <h3>Lohnregel</h3>
-                  <div className="form-grid">
-                    <Field label="Name"><input value={wageRuleForm.name} onChange={event => setWageRuleForm({ ...wageRuleForm, name: event.target.value })} /></Field>
-                    <Field label="Stundenansatz"><input type="number" step="0.05" value={wageRuleForm.hourlyRate} onChange={event => setWageRuleForm({ ...wageRuleForm, hourlyRate: event.target.value })} /></Field>
-                    <Field label="Zuschlag %"><input type="number" value={wageRuleForm.bonus} onChange={event => setWageRuleForm({ ...wageRuleForm, bonus: event.target.value })} /></Field>
-                    <Field label="Zuordnung"><input value={wageRuleForm.assignment} onChange={event => setWageRuleForm({ ...wageRuleForm, assignment: event.target.value })} /></Field>
-                    <Field label="Gültig ab"><input type="date" value={wageRuleForm.validFrom} onChange={event => setWageRuleForm({ ...wageRuleForm, validFrom: event.target.value })} /></Field>
-                    <Field label="Gültig bis"><input type="date" value={wageRuleForm.validTo} onChange={event => setWageRuleForm({ ...wageRuleForm, validTo: event.target.value })} /></Field>
-                  </div>
-                  <div className="actions" style={{ marginTop: 14 }}>
-                    <button className="primary-button" type="submit">Speichern</button>
+                    {editing.wageRuleId && <button className="ghost-button" type="button" onClick={() => { setWageRuleForm(emptyWageRule); setEditing(c => ({ ...c, wageRuleId: null })); }}>Abbrechen</button>}
                   </div>
                 </form>
               </div>
@@ -1171,24 +1202,29 @@ export default function DashboardPage() {
                       <thead>
                         <tr>
                           <th>Name</th>
-                          <th>Regel</th>
-                          <th>Konzept</th>
+                          <th>Tagesmax.</th>
+                          <th>Wochenmax.</th>
+                          <th>Pause</th>
+                          <th>Status</th>
                           <th>Aktion</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {state.timeRules.map(rule => (
+                        {apiTimeRules.length === 0 && (
+                          <tr><td colSpan={6} style={{ textAlign: 'center', color: '#888', padding: 12 }}>Keine Stundenregeln vorhanden</td></tr>
+                        )}
+                        {apiTimeRules.map(rule => (
                           <tr key={rule.id}>
                             <td>{rule.name}</td>
-                            <td>{rule.targetHours}h, {rule.breakMinutes} Min. Pause<br /><span className="muted">{rule.overtimeRule}</span></td>
-                            <td>{findName(state.concepts, rule.conceptId)}</td>
+                            <td>{rule.maxDailyHours != null ? `${rule.maxDailyHours} h` : '—'}</td>
+                            <td>{rule.maxWeeklyHours != null ? `${rule.maxWeeklyHours} h` : '—'}</td>
+                            <td>{rule.breakAfterHours != null ? `nach ${rule.breakAfterHours} h → ${rule.breakDurationMinutes} min` : '—'}</td>
+                            <td><StatusBadge value={rule.active ? 'aktiv' : 'inaktiv'} /></td>
                             <td>
                               <button className="secondary-button" type="button" onClick={() => {
-                                setTimeRuleForm({ ...emptyTimeRule, ...rule });
+                                setTimeRuleForm({ name: rule.name, maxDailyHours: rule.maxDailyHours ?? 8, maxWeeklyHours: rule.maxWeeklyHours ?? 40, breakAfterHours: rule.breakAfterHours ?? 6, breakDurationMinutes: rule.breakDurationMinutes ?? 30, active: rule.active });
                                 setEditing(current => ({ ...current, timeRuleId: rule.id }));
-                              }}>
-                                Bearbeiten
-                              </button>
+                              }}>Bearbeiten</button>
                             </td>
                           </tr>
                         ))}
@@ -1204,23 +1240,28 @@ export default function DashboardPage() {
                         <tr>
                           <th>Name</th>
                           <th>Ansatz</th>
-                          <th>Gültigkeit</th>
+                          <th>Überstunden</th>
+                          <th>Konzept</th>
+                          <th>Status</th>
                           <th>Aktion</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {state.wageRules.map(rule => (
+                        {apiWageRules.length === 0 && (
+                          <tr><td colSpan={6} style={{ textAlign: 'center', color: '#888', padding: 12 }}>Keine Lohnregeln vorhanden</td></tr>
+                        )}
+                        {apiWageRules.map(rule => (
                           <tr key={rule.id}>
-                            <td>{rule.name}<br /><span className="muted">{rule.assignment}</span></td>
-                            <td>CHF {rule.hourlyRate} / h<br /><span className="muted">{rule.bonus}% Zuschlag</span></td>
-                            <td>{rule.validFrom} bis {rule.validTo}</td>
+                            <td>{rule.name}</td>
+                            <td>CHF {rule.hourlyRate} / h</td>
+                            <td>{rule.overtimeRate != null ? `CHF ${rule.overtimeRate} / h` : '—'}</td>
+                            <td>{apiConcepts.find(c => c.id === rule.conceptId)?.name || '—'}</td>
+                            <td><StatusBadge value={rule.active ? 'aktiv' : 'inaktiv'} /></td>
                             <td>
                               <button className="secondary-button" type="button" onClick={() => {
-                                setWageRuleForm({ ...emptyWageRule, ...rule });
+                                setWageRuleForm({ name: rule.name, hourlyRate: rule.hourlyRate, overtimeRate: rule.overtimeRate ?? '', conceptId: rule.conceptId ? String(rule.conceptId) : '', active: rule.active });
                                 setEditing(current => ({ ...current, wageRuleId: rule.id }));
-                              }}>
-                                Bearbeiten
-                              </button>
+                              }}>Bearbeiten</button>
                             </td>
                           </tr>
                         ))}
@@ -1230,39 +1271,70 @@ export default function DashboardPage() {
                 </div>
               </div>
               <div className="panel">
-                <h3>Stundenübersicht</h3>
-                <div className="toolbar">
-                  <input value={search} onChange={event => setSearch(event.target.value)} placeholder="Stunden suchen" />
-                  <input type="month" value={filters.timePeriod} onChange={event => setFilter('timePeriod', event.target.value)} />
+                <h3>Stundenübersicht (Time Service)</h3>
+                <div style={{ display: 'flex', gap: 12, marginBottom: 12, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+                  <label style={{ fontSize: 14 }}>Von<br /><input type="date" value={timeFrom} onChange={e => setTimeFrom(e.target.value)} style={{ padding: '7px 10px', border: '1px solid #c8d0d9', borderRadius: 6 }} /></label>
+                  <label style={{ fontSize: 14 }}>Bis<br /><input type="date" value={timeTo} onChange={e => setTimeTo(e.target.value)} style={{ padding: '7px 10px', border: '1px solid #c8d0d9', borderRadius: 6 }} /></label>
+                  <button className="primary-button" type="button" onClick={() => loadTimeTotal(timeFrom, timeTo)}>Laden</button>
                 </div>
-              </div>
-              <div className="table-wrap">
-                <table>
-                  <thead>
-                    <tr>
-                      <th>Mitarbeiter</th>
-                      <th>Auftrag</th>
-                      <th>Datum</th>
-                      <th>Check-in</th>
-                      <th>Check-out</th>
-                      <th>Stunden</th>
-                      <th>Status</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredTimeEntries.map(entry => (
-                      <tr key={entry.id}>
-                        <td>{findName(state.employees, entry.employeeId)}</td>
-                        <td>{state.orders.find(order => order.id === entry.orderId)?.title || 'Unbekannt'}</td>
-                        <td>{entry.date}</td>
-                        <td>{entry.checkIn || '-'}</td>
-                        <td>{entry.checkOut || '-'}</td>
-                        <td>{entry.hours}</td>
-                        <td><StatusBadge value={entry.status} /> <span className="muted">{entry.note}</span></td>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 10, marginBottom: 14 }}>
+                  <div style={{ padding: 12, border: '1px solid #e0e6ed', borderRadius: 8, background: '#f8fafc' }}>
+                    <strong style={{ fontSize: 22 }}>{apiTimeTotal.length}</strong><br /><span style={{ fontSize: 13, color: '#607080' }}>Mitarbeiter mit Stunden</span>
+                  </div>
+                  <div style={{ padding: 12, border: '1px solid #e0e6ed', borderRadius: 8, background: '#f8fafc' }}>
+                    <strong style={{ fontSize: 22 }}>{apiBreakViolations.length}</strong><br /><span style={{ fontSize: 13, color: '#607080' }}>Pausenverstösse</span>
+                  </div>
+                </div>
+                <div className="table-wrap">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Mitarbeiter-ID</th>
+                        <th>Gesamtstunden</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {apiTimeTotal.length === 0 && (
+                        <tr><td colSpan={2} style={{ textAlign: 'center', color: '#888', padding: 14 }}>Keine Stundendaten im gewählten Zeitraum</td></tr>
+                      )}
+                      {apiTimeTotal.map(row => (
+                        <tr key={row.employeeId}>
+                          <td>{row.employeeId}</td>
+                          <td><b>{Number(row.totalHours).toFixed(2)} h</b></td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                {apiBreakViolations.length > 0 && (
+                  <>
+                    <h4 style={{ marginTop: 20 }}>Pausenverstösse</h4>
+                    <div className="table-wrap">
+                      <table>
+                        <thead>
+                          <tr>
+                            <th>Datum</th>
+                            <th>Mitarbeiter-ID</th>
+                            <th>Pause</th>
+                            <th>Erforderlich</th>
+                            <th>Stunden</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {apiBreakViolations.map(row => (
+                            <tr key={row.id}>
+                              <td>{row.entryDate}</td>
+                              <td>{row.employeeId}</td>
+                              <td>{row.breakMinutes ?? 0} min</td>
+                              <td><b>{row.requiredBreakMinutes} min</b></td>
+                              <td>{row.totalHours != null ? `${Number(row.totalHours).toFixed(2)} h` : '—'}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </>
+                )}
               </div>
             </section>
           )}

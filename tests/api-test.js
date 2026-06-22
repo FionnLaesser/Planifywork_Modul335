@@ -168,10 +168,16 @@ async function testPlanningService() {
   const TEST_END   = '2099-01-31';
   const TEST_SHIFT = '2099-01-15';
 
+  // HR-Stundenfreigabe – Voraussetzung für Arbeitsplan
+  const { status: sb } = await req('POST', '/api/planning/hour-budgets', {
+    shiftLeadId: slId, year: 2099, month: 1, approvedHours: 100, createdBy: 2, notes: 'Autotest'
+  }, tokens['HR']);
+  check('POST /api/planning/hour-budgets – HR-Stundenfreigabe', sb === 200 || sb === 201, `HTTP ${sb}`);
+
   // US-SL-002 – Arbeitsplan erstellen
   const { status: s1, data: plan } = await req('POST', '/api/planning/workplans', {
     title: '[AUTOTEST] Plan', shiftLeadId: slId,
-    startDate: TEST_START, endDate: TEST_END, approvedHours: 100,
+    startDate: TEST_START, endDate: TEST_END,
   }, tokens['SHIFT_LEAD']);
   check('POST /api/planning/workplans – erstellen  (US-SL-002)', s1 === 200 || s1 === 201, `HTTP ${s1}`);
 
@@ -181,7 +187,7 @@ async function testPlanningService() {
     : { status: 0, data: null };
   check('Plan abrufbar nach Erstellung  (US-SL-002 AK-3)', s2 === 200, `HTTP ${s2}`);
   check('Status ist DRAFT', fetched?.status === 'DRAFT', `status=${fetched?.status}`);
-  check('approvedHours korrekt gespeichert  (US-SL-002 AK-2)', Number(fetched?.approvedHours) === 100, `${fetched?.approvedHours}`);
+  check('approvedHours aus HR-Freigabe übernommen  (US-SL-002 AK-2)', Number(fetched?.approvedHours) === 100, `${fetched?.approvedHours}`);
 
   if (plan?.id && empId) {
     // US-SL-003 – Schicht hinzufügen
@@ -295,6 +301,23 @@ async function testBillingService() {
     check('PUT .../pay – SENT → PAID  (US-HR-07)', s5 === 200, `HTTP ${s5}`);
     check('Status ist PAID', paid?.status === 'PAID', `status=${paid?.status}`);
   }
+
+  // Lohnauszug aus Time Entries berechnen
+  const { status: sp1, data: payroll } = await req('POST', '/api/billing/payroll-statements', {
+    employeeId: 4, year: 2026, month: 6, hourlyRate: 30, bonusAmount: 50, deductionAmount: 20, createdBy: 2
+  }, tokens['HR']);
+  check('POST /api/billing/payroll-statements – Lohnauszug erstellen', sp1 === 200 || sp1 === 201, `HTTP ${sp1}`);
+
+  const { status: sp2, data: payrollList } = await req('GET', '/api/billing/payroll-statements', null, tokens['HR']);
+  check('GET /api/billing/payroll-statements – Lohnauszüge laden', sp2 === 200 && Array.isArray(payrollList), `HTTP ${sp2}`);
+
+  if (payroll?.id) {
+    const { status: sp3, data: approved } = await req('PUT', `/api/billing/payroll-statements/${payroll.id}/approve`, null, tokens['HR']);
+    check('PUT payroll-statements/:id/approve – freigeben', sp3 === 200 && approved?.status === 'APPROVED', `HTTP ${sp3}`);
+
+    const { status: sp4, data: paid } = await req('PUT', `/api/billing/payroll-statements/${payroll.id}/pay`, null, tokens['HR']);
+    check('PUT payroll-statements/:id/pay – bezahlt markieren', sp4 === 200 && paid?.status === 'PAID', `HTTP ${sp4}`);
+  }
 }
 
 async function testTimeService() {
@@ -306,6 +329,9 @@ async function testTimeService() {
   } else {
     check('GET /api/time/total – Gesamtstunden  (US-HR-04)', s1 === 200 && Array.isArray(totals), `HTTP ${s1}`);
   }
+
+  const { status: sv, data: violations } = await req('GET', '/api/time/break-violations', null, tokens['HR']);
+  check('GET /api/time/break-violations – Pausenverstösse laden', sv === 200 && Array.isArray(violations), `HTTP ${sv}`);
 
   const { status: s2 } = await req('GET', '/api/time/month/4?month=6&year=2026', null, tokens['HR']);
   if (s2 === 404 || s2 === 501 || s2 === 503 || s2 === 0) {
@@ -327,6 +353,69 @@ async function cleanupTestData() {
   }
 }
 
+async function testConfigService() {
+  section('Config Service  (Firmenkonzepte / Stundenregeln / Lohnregeln)');
+
+  // ── Konzepte ─────────────────────────────────────────────────
+  const { status: gc1, data: concepts } = await req('GET', '/api/config/concepts', null, tokens['ADMIN']);
+  check('GET /api/config/concepts – Admin darf lesen', gc1 === 200 && Array.isArray(concepts), `HTTP ${gc1}`);
+
+  const { status: gc2 } = await req('GET', '/api/config/concepts', null, tokens['HR']);
+  check('GET /api/config/concepts – HR darf lesen', gc2 === 200, `HTTP ${gc2}`);
+
+  const { status: gc3 } = await req('GET', '/api/config/concepts', null, tokens['SHIFT_LEAD']);
+  check('GET /api/config/concepts – SHIFT_LEAD darf lesen', gc3 === 200, `HTTP ${gc3}`);
+
+  const { status: pc1, data: newConcept } = await req('POST', '/api/config/concepts',
+    { name: 'Test-Konzept CI', description: 'Automatisch erstellt', active: true },
+    tokens['ADMIN']);
+  check('POST /api/config/concepts – Admin darf erstellen', pc1 === 201, `HTTP ${pc1}`);
+
+  if (newConcept?.id) {
+    const { status: pu1, data: updated } = await req('PUT', `/api/config/concepts/${newConcept.id}`,
+      { name: 'Test-Konzept CI (aktualisiert)', active: false },
+      tokens['ADMIN']);
+    check('PUT /api/config/concepts/:id – Admin darf bearbeiten', pu1 === 200 && updated?.active === false, `HTTP ${pu1}`);
+  }
+
+  const { status: pc2 } = await req('POST', '/api/config/concepts',
+    { name: 'Sollte fehlschlagen', active: true },
+    tokens['HR']);
+  check('POST /api/config/concepts – HR darf NICHT erstellen (403)', pc2 === 403, `HTTP ${pc2}`);
+
+  // ── Stundenregeln ─────────────────────────────────────────────
+  const { status: gt1, data: timeRules } = await req('GET', '/api/config/time-rules', null, tokens['ADMIN']);
+  check('GET /api/config/time-rules – Admin darf lesen', gt1 === 200 && Array.isArray(timeRules), `HTTP ${gt1}`);
+
+  const { status: pt1, data: newTimeRule } = await req('POST', '/api/config/time-rules',
+    { name: 'CI-Stundenregel', maxDailyHours: 8.5, maxWeeklyHours: 42, breakAfterHours: 6, breakDurationMinutes: 30, active: true },
+    tokens['ADMIN']);
+  check('POST /api/config/time-rules – Admin darf erstellen', pt1 === 201, `HTTP ${pt1}`);
+
+  if (newTimeRule?.id) {
+    const { status: put1 } = await req('PUT', `/api/config/time-rules/${newTimeRule.id}`,
+      { name: 'CI-Stundenregel (aktualisiert)', active: false },
+      tokens['ADMIN']);
+    check('PUT /api/config/time-rules/:id – Admin darf bearbeiten', put1 === 200, `HTTP ${put1}`);
+  }
+
+  // ── Lohnregeln ────────────────────────────────────────────────
+  const { status: gw1, data: wageRules } = await req('GET', '/api/config/wage-rules', null, tokens['ADMIN']);
+  check('GET /api/config/wage-rules – Admin darf lesen', gw1 === 200 && Array.isArray(wageRules), `HTTP ${gw1}`);
+
+  const { status: pw1, data: newWageRule } = await req('POST', '/api/config/wage-rules',
+    { name: 'CI-Lohnregel', hourlyRate: 28.5, overtimeRate: 42.75, active: true },
+    tokens['ADMIN']);
+  check('POST /api/config/wage-rules – Admin darf erstellen', pw1 === 201, `HTTP ${pw1}`);
+
+  if (newWageRule?.id) {
+    const { status: pwu1 } = await req('PUT', `/api/config/wage-rules/${newWageRule.id}`,
+      { hourlyRate: 30.0, active: true },
+      tokens['ADMIN']);
+    check('PUT /api/config/wage-rules/:id – Admin darf bearbeiten', pwu1 === 200, `HTTP ${pwu1}`);
+  }
+}
+
 // ── Main ──────────────────────────────────────────────────────
 
 async function run() {
@@ -344,6 +433,7 @@ async function run() {
   await testAbsenceService();
   await testBillingService();
   await testTimeService();
+  await testConfigService();
   await cleanupTestData();
 
   const total = passed + failed;

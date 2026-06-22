@@ -39,6 +39,10 @@ public class WorkPlan {
     @Column(name = "end_date", nullable = false)
     private LocalDate endDate;
 
+    /** FK zur HR-Stundenfreigabe, aus der das Kontingent übernommen wurde. */
+    @Column(name = "hour_budget_id")
+    private Long hourBudgetId;
+
     /** Von HR freigegebene Stunden für diesen Arbeitsplan/Monat. */
     @Column(name = "approved_hours", nullable = false, precision = 8, scale = 2)
     private BigDecimal approvedHours = BigDecimal.ZERO;

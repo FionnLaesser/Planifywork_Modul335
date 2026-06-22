@@ -43,7 +43,7 @@ jobs:
       - name: Seed-User prüfen (user-role-service)
         run: |
           echo "Warte auf Seed-User..."
-          timeout 60 bash -c \
+          timeout 150 bash -c \
             'until docker compose logs user-role-service 2>/dev/null | grep -q "Seed-User angelegt"; do
               sleep 3
             done'
@@ -51,7 +51,7 @@ jobs:
 
       - name: Warten bis API-Gateway erreichbar ist
         run: |
-          timeout 60 bash -c \
+          timeout 150 bash -c \
             'until curl -s -o /dev/null -w "%{http_code}" http://localhost:8000/api/auth/login \
               -X POST -H "Content-Type: application/json" \
               -d "{\"username\":\"admin\",\"password\":\"password\"}" | grep -q "200"; do

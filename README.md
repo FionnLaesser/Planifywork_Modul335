@@ -107,17 +107,19 @@ Alle Frontends verwenden denselben Login-Endpunkt über den API-Gateway (`localh
 | Seite | URL | Funktion |
 |---|---|---|
 | Benutzerverwaltung | `/users` | Schichtleiter/Mitarbeiter anlegen, bearbeiten, deaktivieren |
-| Stundenübersicht | `/time` | Gesamtstunden pro Zeitraum, Monatsdetail pro Mitarbeiter |
+| Stundenübersicht | `/time` | Gesamtstunden, Monatsdetail und Pausenverstösse prüfen |
+| Stundenfreigabe | `/hour-budgets` | Monatliche HR-Stundenkontingente für Schichtleiter festlegen |
 | Rechnungen | `/invoices` | Rechnungen erstellen, versenden, als bezahlt markieren |
+| Lohnauszüge | `/payroll` | Monatslohn aus Stunden, Rate, Zuschlägen und Abzügen berechnen |
 | Absenzen & Ferien | `/absences` | Ferienanträge genehmigen/ablehnen, Absenzen erfassen |
 
 **Schichtleiter** → http://localhost:3003
 
 | Seite | URL | Funktion |
 |---|---|---|
-| Arbeitsplanung | `/planning` | Arbeitspläne erstellen, Schichten hinzufügen, veröffentlichen |
+| Arbeitsplanung | `/planning` | Arbeitspläne mit HR-Stundenfreigabe erstellen, Schichten hinzufügen, veröffentlichen |
 | Aufträge | `/orders` | Zugewiesene Aufträge aus dem Order Service einsehen und Status ändern |
-| Arbeitszeiten | `/time` | Gesamtstunden und Monatsdetails der Mitarbeiter aus dem Time Service einsehen |
+| Arbeitszeiten | `/time` | Gesamtstunden, Monatsdetails und Pausenverstösse der Mitarbeiter einsehen |
 
 **Flutter Mobile App** (Login: `emp.meier` / `password`)
 
@@ -415,11 +417,13 @@ Jede React-App hat dieselbe interne Struktur:
 | `/api/absences/**` | absence-vacation-service :8006 |
 | `/api/billing/**` | billing-service :8007   |
 | `/api/media/**` | report-media-service :8008|
+| `/api/flipper-auth/**` | flipper-auth-service :8009 |
 
-**Noch zu implementieren:**
-- JWT-Filter (Token prüfen, bevor Anfrage weitergeleitet wird)
-- CORS-Konfiguration für alle Frontends
-- Rate Limiting (optional)
+**Hinweis zur Integration:**
+- Das Gateway leitet alle `/api/**`-Requests an die passenden Microservices weiter.
+- JWT-Header werden durchgereicht; die rollenbasierte Prüfung passiert in den jeweiligen Services per Spring Security.
+- CORS ist für Admin, HR, Schichtleiter und Flipper-Web konfiguriert.
+- Rate Limiting bleibt optional.
 
 ---
 
@@ -498,24 +502,43 @@ Content-Type: application/json
 
 ### 6.5 Planning Service · Port 8004
 
-**Aufgabe:** Schichtleiter erstellt Arbeitspläne für sein Team. Mitarbeiter sehen ihren Arbeitskalender. Der Service verwaltet HR-Stundenkontingente, geplante Schichten, Warnungen bei Über-/Unterplanung und den veröffentlichten Kalender für die Mobile App.
+**Aufgabe:** HR gibt monatliche Stundenkontingente pro Schichtleiter frei. Schichtleiter erstellen darauf basierend Arbeitspläne für ihr Team. Mitarbeiter sehen veröffentlichte Schichten im Mobile-Kalender.
 
 **Implementiert:**
-- `POST /api/planning/workplans` – Arbeitsplan mit HR-Stundenkontingent erstellen
+- `POST /api/planning/hour-budgets` – HR-Stundenkontingent pro Schichtleiter und Monat erstellen/aktualisieren
+- `GET /api/planning/hour-budgets` – HR-Stundenkontingente auflisten, optional mit `?shiftLeadId=` filtern
+- `POST /api/planning/workplans` – Arbeitsplan erstellen und HR-Stundenkontingent automatisch übernehmen
 - `GET /api/planning/workplans` – Arbeitspläne auflisten, optional mit `?shiftLeadId=` filtern
 - `GET /api/planning/workplans/{id}` – Arbeitsplan inkl. Schichten und Stundenübersicht anzeigen
 - `PUT /api/planning/workplans/{id}` – Arbeitsplan-Entwurf bearbeiten
 - `POST /api/planning/workplans/{id}/shifts` – Schicht hinzufügen, optional mit `orderId`
 - `PUT /api/planning/workplans/{id}/publish` – Arbeitsplan veröffentlichen
 - `GET /api/planning/calendar/{employeeId}` – veröffentlichte Kalenderschichten eines Mitarbeiters anzeigen
-- Entities: `WorkPlan`, `Shift`, `WorkPlanStatus`
+- Entities: `HourBudget`, `WorkPlan`, `Shift`, `WorkPlanStatus`
 
 **Stundenlogik:**
-- `approvedHours` enthält die von HR freigegebenen Monats-/Planstunden.
+- `approvedHours` wird aus der HR-Stundenfreigabe übernommen und nicht mehr vom Schichtleiter eingegeben.
 - `plannedHours` wird aus allen Schichten eines Arbeitsplans berechnet.
 - `remainingHours` zeigt die Differenz zwischen freigegebenen und geplanten Stunden.
 - `overLimit` wird `true`, wenn mehr als das HR-Kontingent geplant wurde.
 - `underPlanned` wird `true`, wenn weniger als 95 % des HR-Kontingents geplant wurden.
+
+**Beispiel: HR-Stundenfreigabe erstellen**
+
+```http
+POST http://localhost:8000/api/planning/hour-budgets
+Authorization: Bearer <hr-token>
+Content-Type: application/json
+
+{
+  "shiftLeadId": 3,
+  "year": 2026,
+  "month": 6,
+  "approvedHours": 1000,
+  "createdBy": 2,
+  "notes": "Sommermonat Juni"
+}
+```
 
 **Beispiel: Arbeitsplan erstellen**
 
@@ -528,8 +551,7 @@ Content-Type: application/json
   "title": "Monatsplan Juni",
   "shiftLeadId": 3,
   "startDate": "2026-06-01",
-  "endDate": "2026-06-30",
-  "approvedHours": 1000
+  "endDate": "2026-06-30"
 }
 ```
 
@@ -565,9 +587,11 @@ Content-Type: application/json
 - `GET /api/time/month/{employeeId}?month=&year=` – Monatsauswertung pro Mitarbeiter
 - `GET /api/time/total?from=&to=` – Gesamtstunden aller Mitarbeiter im Zeitraum
 - `GET /api/time/total/{employeeId}?from=&to=` – Gesamtstunden eines Mitarbeiters im Zeitraum
+- `GET /api/time/break-violations?from=&to=&employeeId=` – Pausenverstösse auswerten
 - Rollen: HR/Admin für Auswertungen, Schichtleiter für Team-Übersicht, Mitarbeiter für eigenen Check-in/out
 - Entities: `TimeEntry`
 - Berechnung: Netto-Stunden aus Check-in, Check-out und Pausenzeit
+- Pausenregel: mehr als 6 Stunden Brutto-Arbeitszeit → mindestens 30 Minuten Pause; mehr als 9 Stunden → mindestens 45 Minuten Pause
 
 ---
 
@@ -592,16 +616,26 @@ Content-Type: application/json
 
 ### 6.8 Billing Service · Port 8007
 
-**Aufgabe:** HR erstellt Rechnungen basierend auf erfassten Arbeitsstunden.
+**Aufgabe:** HR erstellt Rechnungen und monatliche Lohnauszüge basierend auf erfassten Arbeitsstunden.
 
-**Noch zu implementieren:**
+**Implementiert Rechnungen:**
 - `POST /api/billing/invoices` – Rechnung erstellen
 - `GET /api/billing/invoices` – alle Rechnungen
 - `GET /api/billing/invoices/{id}` – Rechnungsdetail
 - `PUT /api/billing/invoices/{id}/send` – Rechnung versenden
+- `PUT /api/billing/invoices/{id}/pay` – Rechnung als bezahlt markieren
 - Entities: `Invoice`, `InvoicePosition`
 - Status-Enum: `DRAFT`, `SENT`, `PAID`
-- Stundendaten kommen vom Time Service
+
+**Implementiert Lohnauszüge:**
+- `POST /api/billing/payroll-statements` – Lohnauszug aus Monatsstunden, Stundenrate, Zuschlägen und Abzügen erstellen oder neu berechnen
+- `GET /api/billing/payroll-statements` – Lohnauszüge auflisten, optional mit `?status=` filtern
+- `GET /api/billing/payroll-statements/{id}` – Lohnauszug anzeigen
+- `PUT /api/billing/payroll-statements/{id}/approve` – Lohnauszug freigeben
+- `PUT /api/billing/payroll-statements/{id}/pay` – Lohnauszug als bezahlt markieren
+- Entities: `PayrollStatement`, `PayrollStatus`
+- Status-Enum: `DRAFT`, `APPROVED`, `PAID`
+- Stundendaten kommen aus `time_entries` des Time Service
 
 ---
 
@@ -669,8 +703,10 @@ note=Rapportfoto Eingang A
 **Implementiert:**
 - Login mit Rollenprüfung `HR`
 - Benutzerverwaltung (`/users`): Schichtleiter/Mitarbeiter anlegen, bearbeiten, deaktivieren
-- Stundenübersicht (`/time`): Gesamtstunden aller Mitarbeiter, Monatsdetail pro Mitarbeiter
+- Stundenübersicht (`/time`): Gesamtstunden, Monatsdetail und Pausenverstösse prüfen
+- Stundenfreigabe (`/hour-budgets`): Monatskontingente pro Schichtleiter freigeben
 - Rechnungen (`/invoices`): Erstellen, versenden, als bezahlt markieren (DRAFT → SENT → PAID)
+- Lohnauszüge (`/payroll`): Monatslohn aus Stunden, Stundenrate, Zuschlägen und Abzügen berechnen (DRAFT → APPROVED → PAID)
 - Absenzen & Ferien (`/absences`): Ferienanfragen genehmigen/ablehnen, Absenzen erfassen und verwalten
 
 **Noch zu implementieren:**
@@ -681,10 +717,10 @@ note=Rapportfoto Eingang A
 **Implementiert:**
 - Login mit Rollenprüfung `SHIFT_LEAD` und Speicherung von `userId`
 - Dashboard mit Kacheln für Planung, Aufträge und Notizen
-- Arbeitsplan-Erstellung (`/planning`)
+- Arbeitsplan-Erstellung (`/planning`) mit automatisch übernommener HR-Stundenfreigabe
 - Schichten hinzufügen inklusive Mitarbeiter-Auswahl, optionaler Auftrag-ID und Notiz
 - Stundenübersicht mit HR-Kontingent, geplanten Stunden, Reststunden und Warnungen
-- Arbeitszeiten-Seite (`/time`) lädt Gesamtstunden und Monatsdetails aus dem Time Service
+- Arbeitszeiten-Seite (`/time`) lädt Gesamtstunden, Monatsdetails und Pausenverstösse aus dem Time Service
 - Arbeitsplan veröffentlichen, damit Mitarbeiter die Schichten im Mobile-Kalender sehen
 
 **Implementiert zusätzlich:**
@@ -1118,3 +1154,109 @@ feat(hr-web): implement invoice creation page
 ---
 
 *Viel Erfolg beim Ausarbeiten! Bei Fragen → Issue erstellen oder direkt im Kanban kommentieren.*
+
+---
+
+## 14. Nachträgliche Ergänzungen (Stand 2026-06-22)
+
+### Übersicht der Änderungen
+
+Folgende drei Punkte wurden nachträglich implementiert, um offene Lücken zu schliessen:
+
+1. **Config Service** – neuer Backend-Microservice für Firmenkonzepte, Stundenregeln und Lohnregeln (ersetzt localStorage im Admin-Web)
+2. **Admin-Web: Stundenübersicht vom Time Service** – Echtdaten statt Dummy-Daten
+3. **HR-Web: Abwesenheitskalender** – neuer Tab mit monatlicher Kalenderansicht
+
+---
+
+### 1. Config Service (`backend/config-service`, Port 8010)
+
+**Warum:** Das Admin-Web speicherte Firmenkonzepte, Stundenregeln und Lohnregeln bisher im `localStorage` des Browsers. Das hat mehrere Nachteile: Daten gehen beim Browser-Clear verloren, sind nicht teamweit geteilt und entsprechen nicht der Microservice-Architektur des restlichen Systems.
+
+**Was wurde gemacht:**
+
+- Neuer Spring Boot 3.3 Microservice `config-service` im Package `com.workforce.adminconfig`
+- **Standalone-Maven-Projekt** (eigene `spring-boot-starter-parent`-Elterndependenz), damit die bestehenden Dockerfiles der 10 anderen Services nicht angefasst werden mussten
+- Port **8010**, Container-Name `config-service`
+- Gleiche Sicherheitsarchitektur wie alle anderen Services: JWT-Auth-Filter, stateless, kein CORS (Gateway regelt das)
+- **Berechtigungen:** GET für ADMIN/HR/SHIFT_LEAD; POST/PUT/DELETE nur für ADMIN
+
+**Neue Datenbanktabellen** in `database/mysql/init.sql`:
+
+| Tabelle | Inhalt |
+|---|---|
+| `company_concepts` | Firmenkonzepte: Name, Beschreibung, aktiv/inaktiv |
+| `time_rules` | Stundenregeln: max. Tages-/Wochenstunden, Pausenregel |
+| `wage_rules` | Lohnregeln: Stundenansatz, Überstundenansatz, zugeordnetes Konzept |
+
+**API-Endpunkte:**
+
+```
+GET    /api/config/concepts         → alle Konzepte
+POST   /api/config/concepts         → Konzept erstellen (ADMIN)
+PUT    /api/config/concepts/{id}    → Konzept bearbeiten (ADMIN)
+
+GET    /api/config/time-rules       → alle Stundenregeln
+POST   /api/config/time-rules       → Stundenregel erstellen (ADMIN)
+PUT    /api/config/time-rules/{id}  → Stundenregel bearbeiten (ADMIN)
+
+GET    /api/config/wage-rules       → alle Lohnregeln
+POST   /api/config/wage-rules       → Lohnregel erstellen (ADMIN)
+PUT    /api/config/wage-rules/{id}  → Lohnregel bearbeiten (ADMIN)
+```
+
+**Geänderte Infrastruktur-Dateien:**
+- `backend/api-gateway/src/main/resources/application.yml` → neue Route `/api/config/**`
+- `docker-compose.yml` → `config-service`-Eintrag, in `api-gateway` depends_on ergänzt
+
+---
+
+### 2. Admin-Web: Stundenübersicht vom Time Service
+
+**Warum:** Der Admin konnte bisher nur Dummy-Daten aus dem `localStorage` sehen. Der Time Service (`:8005`) liefert die echten Check-in/Check-out-Einträge aller Mitarbeiter.
+
+**Was wurde gemacht** in `frontend/admin-web/src/pages/DashboardPage.jsx`:
+
+- Neue State-Variablen: `apiTimeTotal`, `apiBreakViolations`, `timeFrom`, `timeTo`
+- Neue Funktion `loadTimeTotal(from, to)` → ruft `GET /api/time/total` und `GET /api/time/break-violations` parallel auf
+- Im Tab **"Lohn und Stunden"**: Stundenübersicht zeigt jetzt echte Gesamtstunden pro Mitarbeiter und Pausenverstösse aus dem Time Service
+- Datumsfilter (Von/Bis) mit Laden-Button – gleiche UX wie auf der HR-Seite
+
+---
+
+### 3. HR-Web: Abwesenheitskalender
+
+**Warum:** In der HR-Web-Applikation gab es zwar eine Absenz-Verwaltungsseite (Genehmigen, Ablehnen, Erstellen), aber keine übersichtliche kalendarische Darstellung aller Absenzen.
+
+**Was wurde gemacht** in `frontend/hr-web/src/pages/AbsencesPage.jsx`:
+
+- Neuer Tab **"Kalender"** neben den bestehenden Tabs "Ausstehende Anträge" und "Alle Absenzen"
+- Monatliche Rasteransicht (Mo–So, ISO-Wochenstart)
+- Farbkodierung nach Absenztyp:
+  - **Ferien** → blau (`#dbeafe` / `#1e40af`)
+  - **Krankheit** → rot (`#fee2e2` / `#991b1b`)
+  - **Sonstiges** → grau (`#f3f4f6` / `#4b5563`)
+- Vor-/Zurück-Navigation zwischen Monaten, Heute-Markierung
+- Lädt alle Absenzen via `GET /api/absences`; das Raster filtert lokal auf den sichtbaren Monat
+
+---
+
+### Ports-Übersicht (vollständig)
+
+| Port | Service |
+|---|---|
+| 8000 | API Gateway |
+| 8001 | Auth Service |
+| 8002 | User & Role Service |
+| 8003 | Order Service |
+| 8004 | Planning Service |
+| 8005 | Time Service |
+| 8006 | Absence & Vacation Service |
+| 8007 | Billing Service |
+| 8008 | Report/Media Service |
+| 8009 | Flipper Auth Service |
+| **8010** | **Config Service (neu)** |
+| 3001 | Admin Web |
+| 3002 | HR Web |
+| 3003 | Schichtleiter Web |
+| 3004 | Flipper Auth Web |

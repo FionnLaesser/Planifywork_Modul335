@@ -1,7 +1,9 @@
 package com.workforce.planning.controller;
 
+import com.workforce.planning.dto.CreateHourBudgetRequest;
 import com.workforce.planning.dto.CreateShiftRequest;
 import com.workforce.planning.dto.CreateWorkPlanRequest;
+import com.workforce.planning.dto.HourBudgetResponse;
 import com.workforce.planning.dto.ShiftResponse;
 import com.workforce.planning.dto.UpdateWorkPlanRequest;
 import com.workforce.planning.dto.WorkPlanResponse;
@@ -37,7 +39,23 @@ public class PlanningController {
 
     private final PlanningService planningService;
 
-    /** Erstellt einen neuen Arbeitsplan mit HR-Stundenkontingent. */
+
+    /** Erstellt oder aktualisiert eine monatliche HR-Stundenfreigabe für einen Schichtleiter. */
+    @PostMapping("/hour-budgets")
+    @PreAuthorize("hasAnyRole('HR', 'ADMIN')")
+    public ResponseEntity<HourBudgetResponse> saveHourBudget(@RequestBody CreateHourBudgetRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(planningService.saveHourBudget(request));
+    }
+
+    /** Gibt HR-Stundenfreigaben zurück; optional gefiltert nach Schichtleiter-ID. */
+    @GetMapping("/hour-budgets")
+    @PreAuthorize("hasAnyRole('HR', 'ADMIN', 'SHIFT_LEAD')")
+    public ResponseEntity<List<HourBudgetResponse>> getHourBudgets(
+            @RequestParam(required = false) Long shiftLeadId) {
+        return ResponseEntity.ok(planningService.getHourBudgets(shiftLeadId));
+    }
+
+    /** Erstellt einen neuen Arbeitsplan mit automatisch übernommener HR-Stundenfreigabe. */
     @PostMapping("/workplans")
     @PreAuthorize("hasAnyRole('SHIFT_LEAD', 'HR', 'ADMIN')")
     public ResponseEntity<WorkPlanResponse> createWorkPlan(@RequestBody CreateWorkPlanRequest request) {

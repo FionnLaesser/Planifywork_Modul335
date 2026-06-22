@@ -81,17 +81,34 @@ CREATE TABLE order_employees (
 
 -- ── Planning / Shifts ────────────────────────────────────────────────────────
 
+CREATE TABLE hour_budgets (
+    id              BIGINT AUTO_INCREMENT PRIMARY KEY,
+    shift_lead_id   BIGINT NOT NULL,
+    budget_year     INT NOT NULL,
+    budget_month    INT NOT NULL,
+    approved_hours  DECIMAL(8,2) NOT NULL DEFAULT 0.00,
+    created_by      BIGINT,
+    notes           VARCHAR(500),
+    created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_hour_budget_shiftlead_month (shift_lead_id, budget_year, budget_month),
+    FOREIGN KEY (shift_lead_id) REFERENCES users(id),
+    FOREIGN KEY (created_by)    REFERENCES users(id)
+);
+
 CREATE TABLE work_plans (
     id              BIGINT AUTO_INCREMENT PRIMARY KEY,
     title           VARCHAR(200) NOT NULL,
     shift_lead_id   BIGINT NOT NULL,
+    hour_budget_id  BIGINT NULL,
     start_date      DATE NOT NULL,
     end_date        DATE NOT NULL,
     approved_hours  DECIMAL(8,2) NOT NULL DEFAULT 0.00,
     status          ENUM('DRAFT','PUBLISHED') NOT NULL DEFAULT 'DRAFT',
     created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     published_at    TIMESTAMP NULL,
-    FOREIGN KEY (shift_lead_id) REFERENCES users(id)
+    FOREIGN KEY (shift_lead_id)  REFERENCES users(id),
+    FOREIGN KEY (hour_budget_id) REFERENCES hour_budgets(id)
 );
 
 CREATE TABLE shifts (
@@ -160,6 +177,61 @@ CREATE TABLE invoice_positions (
     rate        DECIMAL(8,2),
     subtotal    DECIMAL(10,2),
     FOREIGN KEY (invoice_id) REFERENCES invoices(id)
+);
+
+CREATE TABLE payroll_statements (
+    id              BIGINT AUTO_INCREMENT PRIMARY KEY,
+    employee_id     BIGINT NOT NULL,
+    payroll_year    INT NOT NULL,
+    payroll_month   INT NOT NULL,
+    hourly_rate     DECIMAL(8,2) NOT NULL,
+    total_hours     DECIMAL(8,2) NOT NULL DEFAULT 0.00,
+    gross_amount    DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+    bonus_amount    DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+    deduction_amount DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+    net_amount      DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+    status          ENUM('DRAFT','APPROVED','PAID') NOT NULL DEFAULT 'DRAFT',
+    created_by      BIGINT,
+    created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_payroll_employee_month (employee_id, payroll_year, payroll_month),
+    FOREIGN KEY (employee_id) REFERENCES users(id),
+    FOREIGN KEY (created_by)  REFERENCES users(id)
+);
+
+-- ── Config Service ───────────────────────────────────────────────────────────
+
+CREATE TABLE company_concepts (
+    id          BIGINT AUTO_INCREMENT PRIMARY KEY,
+    name        VARCHAR(200) NOT NULL,
+    description TEXT,
+    active      BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at  DATETIME,
+    updated_at  DATETIME
+);
+
+CREATE TABLE time_rules (
+    id                   BIGINT AUTO_INCREMENT PRIMARY KEY,
+    name                 VARCHAR(200) NOT NULL,
+    max_daily_hours      DECIMAL(5,2),
+    max_weekly_hours     DECIMAL(5,2),
+    break_after_hours    DECIMAL(5,2),
+    break_duration_minutes INT,
+    active               BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at           DATETIME,
+    updated_at           DATETIME
+);
+
+CREATE TABLE wage_rules (
+    id             BIGINT AUTO_INCREMENT PRIMARY KEY,
+    name           VARCHAR(200) NOT NULL,
+    hourly_rate    DECIMAL(8,2) NOT NULL,
+    overtime_rate  DECIMAL(8,2),
+    concept_id     BIGINT,
+    active         BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at     DATETIME,
+    updated_at     DATETIME,
+    FOREIGN KEY (concept_id) REFERENCES company_concepts(id)
 );
 
 -- ── Seed: Roles ──────────────────────────────────────────────────────────────

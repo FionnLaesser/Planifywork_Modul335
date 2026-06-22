@@ -6,11 +6,9 @@ import java.time.LocalDate;
 /**
  * DTO zum Erstellen eines Arbeitsplans.
  *
- * @param title         Titel des Arbeitsplans
- * @param shiftLeadId   ID des verantwortlichen Schichtleiters
- * @param startDate     Startdatum des Planungszeitraums
- * @param endDate       Enddatum des Planungszeitraums
- * @param approvedHours von HR freigegebenes Stundenkontingent
+ * <p>Das Stundenkontingent wird nicht vom Schichtleiter bestimmt, sondern anhand der
+ * HR-Stundenfreigabe für {@code shiftLeadId + Monat/Jahr} automatisch übernommen.
+ * {@code approvedHours} bleibt nur aus Abwärtskompatibilitätsgründen im DTO und wird ignoriert.</p>
  */
 public record CreateWorkPlanRequest(
         String title,

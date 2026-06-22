@@ -1,0 +1,18 @@
+server:
+  port: 8010
+
+spring:
+  application:
+    name: config-service
+  datasource:
+    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:workforce}
+    username: workforce
+    password: workforce
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+
+jwt:
+  secret: workforce-super-secret-jwt-key-change-in-production-min-256-bits

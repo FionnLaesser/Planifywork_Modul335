@@ -2,8 +2,10 @@ import { useNavigate, Link } from 'react-router-dom';
 
 const CARDS = [
   { to: '/users',    mark: 'HR',   title: 'Benutzerverwaltung', desc: 'Mitarbeiter und Rollen verwalten' },
-  { to: '/time',     mark: 'Zeit', title: 'Stundenübersicht',   desc: 'Check-in/out und Monatsstunden prüfen' },
-  { to: '/invoices', mark: 'CHF',  title: 'Rechnungen',         desc: 'Erstellen, versenden und abrechnen' },
+  { to: '/time',     mark: 'Zeit', title: 'Stundenübersicht',   desc: 'Check-in/out, Monatsstunden und Pausenverstösse prüfen' },
+  { to: '/hour-budgets', mark: 'Std', title: 'Stundenfreigabe', desc: 'Monatliche Stundenkontingente für Schichtleiter festlegen' },
+  { to: '/invoices', mark: 'CHF',  title: 'Rechnungen',         desc: 'Rechnungen erstellen, versenden und abrechnen' },
+  { to: '/payroll',  mark: 'Lohn', title: 'Lohnauszüge',       desc: 'Monatslohn aus Stunden, Rate, Zuschlägen und Abzügen berechnen' },
   { to: '/absences', mark: 'Abw',  title: 'Absenzen & Ferien',  desc: 'Anträge prüfen und genehmigen' },
 ];
 

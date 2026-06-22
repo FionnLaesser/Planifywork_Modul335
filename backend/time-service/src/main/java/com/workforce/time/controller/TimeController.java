@@ -100,6 +100,22 @@ public class TimeController {
         return ResponseEntity.ok(timeService.getMonthlyEntries(employeeId, m, y));
     }
 
+
+    /** Gibt erkannte Pausenverstösse in einem Zeitraum zurück. */
+    @GetMapping("/break-violations")
+    @PreAuthorize("hasAnyRole('HR', 'ADMIN', 'SHIFT_LEAD')")
+    public ResponseEntity<List<BreakViolationResponse>> getBreakViolations(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            @RequestParam(required = false) Long employeeId) {
+
+        LocalDate today = LocalDate.now(BUSINESS_ZONE);
+        LocalDate start = from != null ? from : today.withDayOfMonth(1);
+        LocalDate end = to != null ? to : today;
+
+        return ResponseEntity.ok(timeService.getBreakViolations(start, end, employeeId));
+    }
+
     @GetMapping("/current/{employeeId}")
     @PreAuthorize("hasAnyRole('EMPLOYEE', 'SHIFT_LEAD', 'HR', 'ADMIN')")
     public ResponseEntity<TimeEntryResponse> getCurrentEntry(@PathVariable Long employeeId) {
