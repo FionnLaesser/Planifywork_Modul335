@@ -5,6 +5,48 @@ Klasse: Modul 335
 
 ---
 
+## Vorschau
+
+### Web-Applikationen
+
+#### HR-Web (http://localhost:3002 · Login: `hr.mueller` / `password`)
+| Dashboard | Stundenfreigabe | Rapport-Bilder |
+|---|---|---|
+| ![HR Dashboard](docs/screenshots/screenshot_hr_dashboard.png) | ![Stundenfreigabe](docs/screenshots/screenshot_hr_stundenfreigabe.png) | ![Rapport-Bilder](docs/screenshots/web_hr_rapports.png) |
+
+> **Rapport-Bilder** (`/rapports`): HR wählt einen Mitarbeiter aus dem Dropdown — die App lädt alle via Mobile App hochgeladenen Fotos aus MongoDB und zeigt sie mit Datum, Auftrags-ID und Notiz an. Bild wird per Klick auf "Bild laden" via API Gateway mit JWT-Auth abgerufen.
+
+#### Schichtleiter-Web (http://localhost:3003 · Login: `sl.huber` / `password`)
+| Arbeitsplanung |
+|---|
+| ![Schichtleiter Planung](docs/screenshots/screenshot_sl_planung.png) |
+
+#### Admin-Web (http://localhost:3001 · Login: `admin` / `password`)
+| Dashboard |
+|---|
+| ![Admin Dashboard](docs/screenshots/screenshot_admin_dashboard.png) |
+
+---
+
+### Mobile App (Flutter · Login: `emp.meier` / `password`)
+
+| Login | Check-in/out | Kalender | Absenzen | Rapport-Upload |
+|---|---|---|---|---|
+| ![Login](docs/screenshots/mobile_login.png) | ![Checkin](docs/screenshots/mobile_checkin.png) | ![Kalender](docs/screenshots/mobile_kalender.png) | ![Absenzen](docs/screenshots/mobile_absenzen.png) | ![Rapport](docs/screenshots/mobile_rapport.png) |
+
+> **Kalender**: Zeigt nur veröffentlichte Schichten. Der Schichtleiter muss den Arbeitsplan unter `/planning` zuerst veröffentlichen (Status → PUBLISHED), danach erscheinen die Schichten im Mitarbeiter-Kalender.  
+> **Rapport-Upload**: Foto wird direkt aus der Kamera aufgenommen und via `POST /api/media/upload` (Multipart) durch den API Gateway an den Report/Media Service weitergeleitet, wo es in **MongoDB** gespeichert wird.
+
+---
+
+### MongoDB-Nachweis: Hochgeladenes Rapportbild
+
+![MongoDB Upload](docs/screenshots/mobile_noSQLupload.png)
+
+> Das Bild ist als Binary-Dokument in der Collection `media_reports` der Datenbank `workforce-media` gespeichert. Einsehbar via **Mongo Express** unter http://localhost:8081 oder im HR-Web unter `/rapports`.
+
+---
+
 ## Änderungshistorie
 
 ### 2026-06-22
@@ -15,6 +57,8 @@ Klasse: Modul 335
 - **Seed-Stundenkontingent**: `user-role-service` legt beim Start automatisch ein Stundenkontingent für den laufenden Monat (160h) für `sl.huber` an — frische Umgebung ist sofort nutzbar ohne manuellen HR-Schritt.
 - **Bugfix HR-Stundenfreigabe**: Seite zeigte "Stundenfreigaben konnten nicht geladen werden" wenn planning-service oder user-role-service beim Seitenaufruf noch initialisierte. `Promise.all` wurde durch `Promise.allSettled` ersetzt (Teilfehler blockieren nicht mehr die ganze Seite) + Auto-Retry nach 5 Sekunden.
 - **Bugfix CORS-Doppelheader im Planning Service**: HR-Stundenfreigabe-Seite und Schichtleiter-Arbeitsplanung lieferten einen doppelten `Access-Control-Allow-Origin`-Header → Browser blockierte alle Requests an `/api/planning/**` mit CORS-Fehler. Ursache: der Planning Service setzte den Header auf zwei Wegen gleichzeitig (1) eigene `corsConfigurationSource`-Bean in `SecurityConfig` und (2) `@CrossOrigin`-Annotation direkt auf dem Controller. Alle anderen Services verwenden korrekt `cors.disable()`, da CORS ausschliesslich vom API Gateway zentral verwaltet wird. Fix: `corsConfigurationSource`-Bean und Import entfernt, `cors.disable()` eingesetzt; `@CrossOrigin`-Annotation und zugehörigen Import aus `PlanningController` entfernt. Zwei Regressionstests in `PlanningControllerTests` stellen sicher, dass der Service künftig keinen CORS-Header direkt setzt.
+- **Neue Seite HR-Web: Rapport-Bilder** (`/rapports`): HR kann hochgeladene Rapportfotos der Mitarbeiter einsehen. Mitarbeiter aus Dropdown wählen → Liste aller Uploads erscheint (Datum, Auftrags-ID, Notiz, Dateigrösse) → Bild wird per Klick lazy via `GET /api/media/{id}` mit JWT-Auth durch den API Gateway geladen und inline angezeigt. Bilder werden als Blob-URLs im Browser gecacht und beim Verlassen der Seite freigegeben. 6 neue API-Tests für den Media Service in `api-test.js` (Listing, Auth, 404); `report-media-service` neu im Maven-Test-Job der CI.
+- **Screenshot-Dokumentation**: 11 Screenshots von allen Frontends und der Mobile App in `docs/screenshots/` abgelegt; Vorschau-Abschnitt oben im README mit Erklärungen zu jedem Screen ergänzt. MongoDB-Nachweis des Bild-Uploads ebenfalls dokumentiert.
 - **Bugfix Bild-Upload Mobile App (Report/Media Service)**: Upload von Kamerabildern schlug aus drei Gründen fehl: (1) Spring Cloud Gateway hat ein Standard-In-Memory-Buffer-Limit von 256 KB — Kamerabilder sind typischerweise 2–6 MB und wurden deshalb vom Gateway mit einem Fehler abgebrochen, bevor sie den Report-Service überhaupt erreichten. Fix: `spring.codec.max-in-memory-size: 10MB` in `api-gateway/application.yml`. (2) Flutter sendete den Content-Type der Bilddatei nicht explizit mit → bei temporären Dateipfaden ohne Endung erkannte die `http`-Library den Typ nicht und sendete `application/octet-stream`, was der Service korrekt ablehnte. Fix: Content-Type wird jetzt anhand der Dateiendung explizit auf `image/jpeg` oder `image/png` gesetzt (`http_parser`-Package). (3) Der globale Request-Timeout von 8 Sekunden gilt auch für den Upload — für grössere Bilder oder langsamere Verbindungen zu knapp. Fix: separater `uploadTimeout` von 30 Sekunden in `ApiConfig`. Zusätzlich: `report-media-service/SecurityConfig` fehlte als einziger Service ein `authenticationEntryPoint` → gab bei fehlendem Token 403 statt 401 zurück. Fix: `authenticationEntryPoint` ergänzt, Verhalten nun konsistent mit allen anderen Services. 7 neue Tests in `MediaControllerTests` (Upload JPEG, Upload PNG, kein Token → 401, falscher Typ → 400, unbekannte ID → 404, listByEmployee, Upload mit Auftrags-ID).
 
 ---
@@ -768,6 +812,8 @@ Die Mobile App verbindet sich mit demselben API Gateway (`:8000`) und verwendet 
 ---
 
 ### Schritt 1 – API-URL konfigurieren
+
+> ⚠️ **Wichtig:** Die URL muss vor dem ersten Start angepasst werden. Ohne korrekte URL kann die App keine Verbindung zum Backend aufbauen.
 
 Die Basis-URL für alle API-Anfragen steht zentral in einer Datei:
 
