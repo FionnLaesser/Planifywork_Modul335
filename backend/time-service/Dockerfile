@@ -22,7 +22,6 @@ RUN mvn -pl backend/time-service -am package -DskipTests -q
 
 FROM eclipse-temurin:21-jre
 WORKDIR /app
-RUN apt-get update && apt-get install -y netcat-openbsd --no-install-recommends && rm -rf /var/lib/apt/lists/*
 COPY --from=build /app/backend/time-service/target/*.jar app.jar
 EXPOSE 8005
 ENTRYPOINT ["java", "-jar", "app.jar"]

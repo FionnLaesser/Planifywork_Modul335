@@ -22,7 +22,6 @@ RUN mvn -pl backend/report-media-service -am package -DskipTests -q
 
 FROM eclipse-temurin:21-jre
 WORKDIR /app
-RUN apt-get update && apt-get install -y netcat-openbsd --no-install-recommends && rm -rf /var/lib/apt/lists/*
 COPY --from=build /app/backend/report-media-service/target/*.jar app.jar
 EXPOSE 8008
 ENTRYPOINT ["java", "-jar", "app.jar"]
