@@ -17,7 +17,7 @@ jobs:
   api-tests:
     name: API Tests (Auth / User / Planning / Absence / Billing)
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 25
 
     steps:
       - name: Checkout

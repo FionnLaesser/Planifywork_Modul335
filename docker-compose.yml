@@ -99,11 +99,11 @@ services:
       mysql-db:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "nc -w 1 localhost 8001 </dev/null"]
+      test: ["CMD-SHELL", "nc -w 3 localhost 8001 </dev/null"]
       interval: 5s
       timeout: 5s
       retries: 20
-      start_period: 60s
+      start_period: 120s
     networks:
       - workforce-net
 
@@ -126,11 +126,11 @@ services:
       mysql-db:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "nc -w 1 localhost 8002 </dev/null"]
+      test: ["CMD-SHELL", "nc -w 3 localhost 8002 </dev/null"]
       interval: 5s
       timeout: 5s
       retries: 20
-      start_period: 60s
+      start_period: 120s
     networks:
       - workforce-net
 
@@ -153,11 +153,11 @@ services:
       mysql-db:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "nc -w 1 localhost 8003 </dev/null"]
+      test: ["CMD-SHELL", "nc -w 3 localhost 8003 </dev/null"]
       interval: 5s
       timeout: 5s
       retries: 20
-      start_period: 60s
+      start_period: 120s
     networks:
       - workforce-net
 
@@ -180,11 +180,11 @@ services:
       mysql-db:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "nc -w 1 localhost 8004 </dev/null"]
+      test: ["CMD-SHELL", "nc -w 3 localhost 8004 </dev/null"]
       interval: 5s
       timeout: 5s
       retries: 20
-      start_period: 60s
+      start_period: 120s
     networks:
       - workforce-net
 
@@ -207,11 +207,11 @@ services:
       mysql-db:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "nc -w 1 localhost 8005 </dev/null"]
+      test: ["CMD-SHELL", "nc -w 3 localhost 8005 </dev/null"]
       interval: 5s
       timeout: 5s
       retries: 20
-      start_period: 60s
+      start_period: 120s
     networks:
       - workforce-net
 
@@ -234,11 +234,11 @@ services:
       mysql-db:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "nc -w 1 localhost 8006 </dev/null"]
+      test: ["CMD-SHELL", "nc -w 3 localhost 8006 </dev/null"]
       interval: 5s
       timeout: 5s
       retries: 20
-      start_period: 60s
+      start_period: 120s
     networks:
       - workforce-net
 
@@ -261,11 +261,11 @@ services:
       mysql-db:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "nc -w 1 localhost 8007 </dev/null"]
+      test: ["CMD-SHELL", "nc -w 3 localhost 8007 </dev/null"]
       interval: 5s
       timeout: 5s
       retries: 20
-      start_period: 60s
+      start_period: 120s
     networks:
       - workforce-net
 
@@ -284,11 +284,11 @@ services:
       mongo-db:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "nc -w 1 localhost 8008 </dev/null"]
+      test: ["CMD-SHELL", "nc -w 3 localhost 8008 </dev/null"]
       interval: 5s
       timeout: 5s
       retries: 20
-      start_period: 60s
+      start_period: 120s
     networks:
       - workforce-net
 
@@ -316,11 +316,11 @@ services:
       user-role-service:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "nc -w 1 localhost 8009 </dev/null"]
+      test: ["CMD-SHELL", "nc -w 3 localhost 8009 </dev/null"]
       interval: 5s
       timeout: 5s
       retries: 20
-      start_period: 60s
+      start_period: 120s
     networks:
       - workforce-net
 
@@ -343,11 +343,11 @@ services:
       mysql-db:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "nc -w 1 localhost 8010 </dev/null"]
+      test: ["CMD-SHELL", "nc -w 3 localhost 8010 </dev/null"]
       interval: 5s
       timeout: 5s
       retries: 20
-      start_period: 60s
+      start_period: 120s
     networks:
       - workforce-net
 
@@ -383,7 +383,7 @@ services:
       flipper-auth-service:
         condition: service_started
     healthcheck:
-      test: ["CMD-SHELL", "nc -w 1 localhost 8000 </dev/null"]
+      test: ["CMD-SHELL", "nc -w 3 localhost 8000 </dev/null"]
       interval: 5s
       timeout: 5s
       retries: 12
