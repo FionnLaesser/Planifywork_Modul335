@@ -14,6 +14,7 @@ Klasse: Modul 335
 - **Bugfix Schichtleiter-Arbeitsplanung**: Beim ersten Seitenaufruf direkt nach dem Docker-Start schlug `loadWorkPlans` fehl (Service noch nicht bereit). Jetzt automatischer Retry nach 5 Sekunden mit Statusmeldung.
 - **Seed-Stundenkontingent**: `user-role-service` legt beim Start automatisch ein Stundenkontingent für den laufenden Monat (160h) für `sl.huber` an — frische Umgebung ist sofort nutzbar ohne manuellen HR-Schritt.
 - **Bugfix HR-Stundenfreigabe**: Seite zeigte "Stundenfreigaben konnten nicht geladen werden" wenn planning-service oder user-role-service beim Seitenaufruf noch initialisierte. `Promise.all` wurde durch `Promise.allSettled` ersetzt (Teilfehler blockieren nicht mehr die ganze Seite) + Auto-Retry nach 5 Sekunden.
+- **Bugfix CORS-Doppelheader im Planning Service**: HR-Stundenfreigabe-Seite und Schichtleiter-Arbeitsplanung lieferten einen doppelten `Access-Control-Allow-Origin`-Header → Browser blockierte alle Requests an `/api/planning/**` mit CORS-Fehler. Ursache: der Planning Service setzte den Header auf zwei Wegen gleichzeitig (1) eigene `corsConfigurationSource`-Bean in `SecurityConfig` und (2) `@CrossOrigin`-Annotation direkt auf dem Controller. Alle anderen Services verwenden korrekt `cors.disable()`, da CORS ausschliesslich vom API Gateway zentral verwaltet wird. Fix: `corsConfigurationSource`-Bean und Import entfernt, `cors.disable()` eingesetzt; `@CrossOrigin`-Annotation und zugehörigen Import aus `PlanningController` entfernt. Zwei Regressionstests in `PlanningControllerTests` stellen sicher, dass der Service künftig keinen CORS-Header direkt setzt.
 
 ---
 
@@ -219,6 +220,7 @@ docker compose down -v && docker compose up --build -d
 | CORS-Fehler 403 | Gateway hatte kein `globalcors`, Services gaben doppelte CORS-Header | Behoben: Gateway verwaltet CORS, Services haben `cors.disable()` |
 | Admin zeigt andere User als HR-Frontend | `adminSeed.js` enthielt lokale Dummy-User (Amir Suter, Lea Baumann etc.); HR- und Mitarbeiter-Formulare schrieben in `localStorage` statt in die DB | Behoben in `DashboardPage.jsx`: `saveHrUser` und `saveEmployee` rufen jetzt `POST /api/users` auf; Suche und Stats verwenden echte API-Daten |
 | Nach Wechsel auf neuen Rechner zeigt Admin noch alte Daten | Browser-`localStorage` vom alten Rechner enthält veralteten Admin-State | DevTools → Application → Local Storage → `planifywork-admin-state-v1` löschen, Seite neu laden |
+| CORS-Fehler „Es darf nur eine CORS-Kopfzeile verwendet werden" auf `/api/planning/**` | Planning Service hatte `corsConfigurationSource`-Bean in `SecurityConfig` **und** `@CrossOrigin` auf dem Controller gleichzeitig; CORS wird aber ausschliesslich vom API Gateway gesetzt | Beide Service-seitigen CORS-Konfigurationen entfernt, `cors.disable()` eingesetzt; gilt als Konvention für alle Services — niemals `@CrossOrigin` oder eigene `CorsConfigurationSource` in einem Service hinzufügen |
 
 ---
 

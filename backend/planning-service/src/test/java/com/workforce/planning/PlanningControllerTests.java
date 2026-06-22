@@ -1,8 +1,10 @@
 package com.workforce.planning;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -216,6 +218,31 @@ class PlanningControllerTests {
     void requestWithoutTokenReturns401() throws Exception {
         mockMvc.perform(get("/api/planning/workplans"))
                 .andExpect(status().isUnauthorized());
+    }
+
+    /**
+     * Stellt sicher, dass der Planning Service selbst keinen Access-Control-Allow-Origin-Header setzt.
+     * CORS wird ausschliesslich vom API Gateway gehandhabt; doppelte Header würden den Browser blockieren.
+     */
+    @Test
+    void serviceDoesNotSetCorsHeaderDirectly() throws Exception {
+        mockMvc.perform(get("/api/planning/workplans")
+                        .header("Authorization", "Bearer " + token("sl.meier", "SHIFT_LEAD"))
+                        .header("Origin", "http://localhost:3002"))
+                .andExpect(status().isOk())
+                .andExpect(header().doesNotExist("Access-Control-Allow-Origin"));
+    }
+
+    /**
+     * Stellt sicher, dass OPTIONS-Preflight-Anfragen an den Service keinen CORS-Header zurückgeben.
+     * Der Gateway übernimmt das Preflight-Handling für alle Frontends.
+     */
+    @Test
+    void optionsPreflightDoesNotReturnCorsHeaderFromService() throws Exception {
+        mockMvc.perform(options("/api/planning/workplans")
+                        .header("Origin", "http://localhost:3002")
+                        .header("Access-Control-Request-Method", "GET"))
+                .andExpect(header().doesNotExist("Access-Control-Allow-Origin"));
     }
 
     private void createHourBudget(int shiftLeadId, int year, int month, int approvedHours) throws Exception {
