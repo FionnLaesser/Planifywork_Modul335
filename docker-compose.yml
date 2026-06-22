@@ -38,6 +38,12 @@ services:
     volumes:
       - mongo-data:/data/db
       - ./database/mongodb/init.js:/docker-entrypoint-initdb.d/init.js:ro
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
     networks:
       - workforce-net
 
@@ -74,30 +80,6 @@ services:
 
   # ── Backend Microservices ───────────────────────────────────────────────────
 
-  api-gateway:
-    build:
-      context: .
-      dockerfile: backend/api-gateway/Dockerfile
-    container_name: api-gateway
-    restart: "no"
-    ports:
-      - "8000:8000"
-    environment:
-      SPRING_PROFILES_ACTIVE: docker
-    depends_on:
-      - auth-service
-      - user-role-service
-      - order-service
-      - planning-service
-      - time-service
-      - absence-vacation-service
-      - billing-service
-      - report-media-service
-      - flipper-auth-service
-      - config-service
-    networks:
-      - workforce-net
-
   auth-service:
     build:
       context: .
@@ -116,6 +98,12 @@ services:
     depends_on:
       mysql-db:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "nc -w 1 localhost 8001 </dev/null"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 60s
     networks:
       - workforce-net
 
@@ -137,6 +125,12 @@ services:
     depends_on:
       mysql-db:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "nc -w 1 localhost 8002 </dev/null"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 60s
     networks:
       - workforce-net
 
@@ -158,6 +152,12 @@ services:
     depends_on:
       mysql-db:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "nc -w 1 localhost 8003 </dev/null"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 60s
     networks:
       - workforce-net
 
@@ -179,6 +179,12 @@ services:
     depends_on:
       mysql-db:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "nc -w 1 localhost 8004 </dev/null"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 60s
     networks:
       - workforce-net
 
@@ -200,6 +206,12 @@ services:
     depends_on:
       mysql-db:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "nc -w 1 localhost 8005 </dev/null"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 60s
     networks:
       - workforce-net
 
@@ -221,6 +233,12 @@ services:
     depends_on:
       mysql-db:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "nc -w 1 localhost 8006 </dev/null"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 60s
     networks:
       - workforce-net
 
@@ -242,6 +260,12 @@ services:
     depends_on:
       mysql-db:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "nc -w 1 localhost 8007 </dev/null"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 60s
     networks:
       - workforce-net
 
@@ -257,7 +281,14 @@ services:
       SPRING_PROFILES_ACTIVE: docker
       SPRING_DATA_MONGODB_URI: mongodb://workforce:workforce@mongo-db:27017/workforce-media?authSource=admin
     depends_on:
-      - mongo-db
+      mongo-db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "nc -w 1 localhost 8008 </dev/null"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 60s
     networks:
       - workforce-net
 
@@ -283,7 +314,80 @@ services:
       mysql-db:
         condition: service_healthy
       user-role-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "nc -w 1 localhost 8009 </dev/null"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 60s
+    networks:
+      - workforce-net
+
+  config-service:
+    build:
+      context: ./backend/config-service
+      dockerfile: Dockerfile
+    container_name: config-service
+    restart: "no"
+    ports:
+      - "8010:8010"
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      DB_HOST: mysql-db
+      DB_PORT: 3306
+      DB_NAME: workforce
+      SPRING_DATASOURCE_USERNAME: workforce
+      SPRING_DATASOURCE_PASSWORD: workforce
+    depends_on:
+      mysql-db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "nc -w 1 localhost 8010 </dev/null"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 60s
+    networks:
+      - workforce-net
+
+  api-gateway:
+    build:
+      context: .
+      dockerfile: backend/api-gateway/Dockerfile
+    container_name: api-gateway
+    restart: "no"
+    ports:
+      - "8000:8000"
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+    depends_on:
+      auth-service:
+        condition: service_healthy
+      user-role-service:
+        condition: service_healthy
+      order-service:
+        condition: service_healthy
+      planning-service:
+        condition: service_healthy
+      time-service:
+        condition: service_healthy
+      absence-vacation-service:
+        condition: service_healthy
+      billing-service:
+        condition: service_healthy
+      config-service:
+        condition: service_healthy
+      report-media-service:
         condition: service_started
+      flipper-auth-service:
+        condition: service_started
+    healthcheck:
+      test: ["CMD-SHELL", "nc -w 1 localhost 8000 </dev/null"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
     networks:
       - workforce-net
 
@@ -319,27 +423,6 @@ services:
     networks:
       - workforce-net
 
-  config-service:
-    build:
-      context: ./backend/config-service
-      dockerfile: Dockerfile
-    container_name: config-service
-    restart: "no"
-    ports:
-      - "8010:8010"
-    environment:
-      SPRING_PROFILES_ACTIVE: docker
-      DB_HOST: mysql-db
-      DB_PORT: 3306
-      DB_NAME: workforce
-      SPRING_DATASOURCE_USERNAME: workforce
-      SPRING_DATASOURCE_PASSWORD: workforce
-    depends_on:
-      mysql-db:
-        condition: service_healthy
-    networks:
-      - workforce-net
-
   flipper-auth-web:
     build:
       context: ./frontend/flipper-auth-web
@@ -348,7 +431,8 @@ services:
     ports:
       - "3004:80"
     depends_on:
-      - api-gateway
+      api-gateway:
+        condition: service_healthy
     networks:
       - workforce-net
 
