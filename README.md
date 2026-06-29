@@ -1,7 +1,7 @@
 # Workforce Management System
 
 Schulprojekt Modul 335 – Mobile Applikation  
-Klasse: Modul 335
+Klasse: IFZM-2426 009 Rudy-Martin-Fionn-Jannik
 
 ![Spring Boot](https://img.shields.io/badge/Spring_Boot-3.3-6DB33F?logo=springboot&logoColor=white)
 ![Flutter](https://img.shields.io/badge/Flutter-3.3+-02569B?logo=flutter&logoColor=white)
