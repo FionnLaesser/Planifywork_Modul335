@@ -3,36 +3,65 @@
 Schulprojekt Modul 335 – Mobile Applikation  
 Klasse: Modul 335
 
+![Spring Boot](https://img.shields.io/badge/Spring_Boot-3.3-6DB33F?logo=springboot&logoColor=white)
+![Flutter](https://img.shields.io/badge/Flutter-3.3+-02569B?logo=flutter&logoColor=white)
+![React](https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=black)
+![Docker](https://img.shields.io/badge/Docker_Compose-2496ED?logo=docker&logoColor=white)
+![MySQL](https://img.shields.io/badge/MySQL-8.0-4479A1?logo=mysql&logoColor=white)
+![MongoDB](https://img.shields.io/badge/MongoDB-7.0-47A248?logo=mongodb&logoColor=white)
+
+---
+
+## Inhaltsverzeichnis
+
+1. [Projektidee](#1-projektidee)
+2. [Technologie-Stack](#2-technologie-stack)
+3. [Rollen & Zugänge](#3-rollen--zugänge)
+4. [Gesamtarchitektur](#4-gesamtarchitektur)
+5. [Projektstruktur](#5-projektstruktur)
+6. [Services im Detail](#6-services-im-detail)
+   - [API Gateway](#61-api-gateway--port-8000)
+   - [Auth Service](#62-auth-service--port-8001)
+   - [User & Role Service](#63-user--role-service--port-8002)
+   - [Order Service](#64-order-service--port-8003)
+   - [Planning Service](#65-planning-service--port-8004)
+   - [Time Service](#66-time-service--port-8005)
+   - [Absence & Vacation Service](#67-absence--vacation-service--port-8006)
+   - [Billing Service](#68-billing-service--port-8007)
+   - [Report / Media Service](#69-report--media-service--port-8008)
+7. [Frontend-Apps](#7-frontend-apps)
+8. [Mobile App (Flutter)](#8-mobile-app-flutter)
+9. [Datenbanken](#9-datenbanken)
+10. [Docker & lokale Umgebung](#10-docker--lokale-umgebung)
+11. [Port-Übersicht](#11-port-übersicht)
+12. [Arbeitsweise im Team (Kanban)](#12-arbeitsweise-im-team-kanban)
+13. [Konventionen & Coding-Standards](#13-konventionen--coding-standards)
+
 ---
 
 ## Vorschau
 
 ### Web-Applikationen
 
-#### HR-Web (http://localhost:3002 · Login: `hr.mueller` / `password`)
-| Dashboard | Stundenfreigabe | Rapport-Bilder |
-|---|---|---|
-| ![HR Dashboard](docs/screenshots/screenshot_hr_dashboard.png) | ![Stundenfreigabe](docs/screenshots/screenshot_hr_stundenfreigabe.png) | ![Rapport-Bilder](docs/screenshots/web_hr_rapports.png) |
+| App | Screenshot 1 | Screenshot 2 | Screenshot 3 |
+|---|---|---|---|
+| **HR Web** `:3002`<br>`hr.mueller` / `password` | ![HR Dashboard](docs/screenshots/screenshot_hr_dashboard.png) | ![Stundenfreigabe](docs/screenshots/screenshot_hr_stundenfreigabe.png) | ![Rapport-Bilder](docs/screenshots/web_hr_rapports.png) |
+| **Schichtleiter Web** `:3003`<br>`sl.huber` / `password` | ![Arbeitsplanung](docs/screenshots/screenshot_sl_planung.png) | | |
+| **Admin Web** `:3001`<br>`admin` / `password` | ![Admin Dashboard](docs/screenshots/screenshot_admin_dashboard.png) | | |
 
 > **Rapport-Bilder** (`/rapports`): HR wählt einen Mitarbeiter aus dem Dropdown — die App lädt alle via Mobile App hochgeladenen Fotos aus MongoDB und zeigt sie mit Datum, Auftrags-ID und Notiz an. Bild wird per Klick auf "Bild laden" via API Gateway mit JWT-Auth abgerufen.
-
-#### Schichtleiter-Web (http://localhost:3003 · Login: `sl.huber` / `password`)
-| Arbeitsplanung |
-|---|
-| ![Schichtleiter Planung](docs/screenshots/screenshot_sl_planung.png) |
-
-#### Admin-Web (http://localhost:3001 · Login: `admin` / `password`)
-| Dashboard |
-|---|
-| ![Admin Dashboard](docs/screenshots/screenshot_admin_dashboard.png) |
 
 ---
 
 ### Mobile App (Flutter · Login: `emp.meier` / `password`)
 
-| Login | Check-in/out | Kalender | Absenzen | Rapport-Upload |
-|---|---|---|---|---|
-| ![Login](docs/screenshots/mobile_login.png) | ![Checkin](docs/screenshots/mobile_checkin.png) | ![Kalender](docs/screenshots/mobile_kalender.png) | ![Absenzen](docs/screenshots/mobile_absenzen.png) | ![Rapport](docs/screenshots/mobile_rapport.png) |
+| Login | Check-in/out | Kalender |
+|---|---|---|
+| ![Login](docs/screenshots/mobile_login.png) | ![Checkin](docs/screenshots/mobile_checkin.png) | ![Kalender](docs/screenshots/mobile_kalender.png) |
+
+| Absenzen | Rapport-Upload |
+|---|---|
+| ![Absenzen](docs/screenshots/mobile_absenzen.png) | ![Rapport](docs/screenshots/mobile_rapport.png) |
 
 > **Kalender**: Zeigt nur veröffentlichte Schichten. Der Schichtleiter muss den Arbeitsplan unter `/planning` zuerst veröffentlichen (Status → PUBLISHED), danach erscheinen die Schichten im Mitarbeiter-Kalender.  
 > **Rapport-Upload**: Foto wird direkt aus der Kamera aufgenommen und via `POST /api/media/upload` (Multipart) durch den API Gateway an den Report/Media Service weitergeleitet, wo es in **MongoDB** gespeichert wird.
@@ -452,33 +481,6 @@ docker compose down -v && docker compose up --build -d
 | Nach Wechsel auf neuen Rechner zeigt Admin noch alte Daten | Browser-`localStorage` vom alten Rechner enthält veralteten Admin-State | DevTools → Application → Local Storage → `planifywork-admin-state-v1` löschen, Seite neu laden |
 | CORS-Fehler „Es darf nur eine CORS-Kopfzeile verwendet werden" auf `/api/planning/**` | Planning Service hatte `corsConfigurationSource`-Bean in `SecurityConfig` **und** `@CrossOrigin` auf dem Controller gleichzeitig; CORS wird aber ausschliesslich vom API Gateway gesetzt | Beide Service-seitigen CORS-Konfigurationen entfernt, `cors.disable()` eingesetzt; gilt als Konvention für alle Services — niemals `@CrossOrigin` oder eigene `CorsConfigurationSource` in einem Service hinzufügen |
 | Bild-Upload aus Mobile App schlägt fehl (kein 200, kein sinnvoller Fehler) | Spring Cloud Gateway hat ein Standard-In-Memory-Buffer-Limit von 256 KB; Kamerabilder sind grösser und werden vom Gateway abgebrochen, bevor der Report-Service sie sieht | `spring.codec.max-in-memory-size: 10MB` in `api-gateway/application.yml` setzen; Limit muss mindestens so gross sein wie `spring.servlet.multipart.max-file-size` im Report-Service |
-
----
-
-## Inhaltsverzeichnis
-
-1. [Projektidee](#1-projektidee)
-2. [Technologie-Stack](#2-technologie-stack)
-3. [Rollen & Zugänge](#3-rollen--zugänge)
-4. [Gesamtarchitektur](#4-gesamtarchitektur)
-5. [Projektstruktur](#5-projektstruktur)
-6. [Services im Detail](#6-services-im-detail)
-   - [API Gateway](#61-api-gateway--port-8000)
-   - [Auth Service](#62-auth-service--port-8001)
-   - [User & Role Service](#63-user--role-service--port-8002)
-   - [Order Service](#64-order-service--port-8003)
-   - [Planning Service](#65-planning-service--port-8004)
-   - [Time Service](#66-time-service--port-8005)
-   - [Absence & Vacation Service](#67-absence--vacation-service--port-8006)
-   - [Billing Service](#68-billing-service--port-8007)
-   - [Report / Media Service](#69-report--media-service--port-8008)
-7. [Frontend-Apps](#7-frontend-apps)
-8. [Mobile App (Flutter)](#8-mobile-app-flutter)
-9. [Datenbanken](#9-datenbanken)
-10. [Docker & lokale Umgebung](#10-docker--lokale-umgebung)
-11. [Port-Übersicht](#11-port-übersicht)
-12. [Arbeitsweise im Team (Kanban)](#12-arbeitsweise-im-team-kanban)
-13. [Konventionen & Coding-Standards](#13-konventionen--coding-standards)
 
 ---
 
